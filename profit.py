@@ -12,31 +12,39 @@ class Sellable:
         self.price = price
         self.inputs = inputs
         self.time_to_make = time_to_make
+        SELLABLES.append(self)
 
-    def get_input_cost(self):
+    def get_input_cost(self) -> tuple(float, int):
+        """Returns price and time (in seconds)"""
         input_cost = 0
+        input_time = 0
         for sellable, amount in self.inputs:
-            c = sellable.get_input_cost()
-            input_cost += c * amount
-        return input_cost
+            money, time = sellable.get_input_cost()
+            input_cost += money * amount
+            input_time += time * amount
+        return input_cost, input_time
 
     def get_profit_per_second(self):
-        profit = self.price - self.get_input_cost()
-        return profit / self.time_to_make
+        input_money, input_time = self.get_input_cost()
+        profit = self.price - input_money
 
-COPPER = Sellable("Copper", 1, [])
-IRON = Sellable("Iron", 2, [])
-LEAD = Sellable("Lead", 4, [])
-SILICON = Sellable("Silicon", 8, [])
-ALUMINUM = Sellable("Aluminum", 17, [])
-SILVER = Sellable("Silver", 36, [])
-GOLD = Sellable("Gold", 75, [])
-DIAMOND = Sellable("Diamond", 160, [])
-PLATINUM = Sellable("Platinum", 340, [])
-TITANIUM = Sellable("Titanium", 730, [])
-IRIDIUM = Sellable("Iridium", 1_600, [])
-PALLADIUM = Sellable("Palladium", 3_500, [])
-OSMIUM = Sellable("Osmium", 7_800, [])
+        return profit / (self.time_to_make + input_time)
+
+SELLABLES: list[Sellable] = []
+
+COPPER = Sellable("Copper Ore", 1, [])
+IRON = Sellable("Iron Ore", 2, [])
+LEAD = Sellable("Lead Ore", 4, [])
+SILICON = Sellable("Silicon Ore", 8, [])
+ALUMINUM = Sellable("Aluminum Ore", 17, [])
+SILVER = Sellable("Silver Ore", 36, [])
+GOLD = Sellable("Gold Ore", 75, [])
+DIAMOND = Sellable("Diamond Ore", 160, [])
+PLATINUM = Sellable("Platinum Ore", 340, [])
+TITANIUM = Sellable("Titanium Ore", 730, [])
+IRIDIUM = Sellable("Iridium Ore", 1_600, [])
+PALLADIUM = Sellable("Palladium Ore", 3_500, [])
+OSMIUM = Sellable("Osmium Ore", 7_800, [])
 # RHODIUM = Sellable("Rhodium", 17_500, [])
 # INERTON = Sellable("Inerton", 40_000, [])
 # QUADIUM = Sellable("Quadium", 92_000, [])
@@ -126,104 +134,9 @@ RADIO_TOWER = Sellable("Radio Tower", 1_450_000_000, [(PLATINUM_BAR, 75), (ALUMI
 # PHASE_GATE = Sellable("Phase Gate", 452_000_000_000_000_000_000_000_000_000_000, [(DEEP_SPACE_SCANNER, 100), (ADVANCED_TELEPORTER, 1_000), (ORBITAL_DOCK, 1)], time_to_make=699_000)
 # NEURAL_MATRIX = Sellable("Neural Matrix", 452_000_000_000_000_000_000_000_000_000_000, [(ANTIMATTER_CELL, 4), (SOLAR_COLLECTOR, 1), (OSMIUM_BAR, 16_000)], time_to_make=699_000)
 
-SELLABLES = [
-    COPPER,
-    IRON,
-    LEAD,
-    SILICON,
-    ALUMINUM,
-    SILVER,
-    GOLD,
-    DIAMOND,
-    PLATINUM,
-    TITANIUM,
-    IRIDIUM,
-    PALLADIUM,
-    OSMIUM,
-    # RHODIUM,
-    # INERTON,
-    # QUADIUM,
-    # SCRITH,
-    # URU,
-    # VIBRANIUM,
-    # AETHER,
-    # VITERIUM,
-    # XYNIUM,
-    # QUOLIUM,
-    # LUTERIUM,
-    # WRAITH,
-    # AQUALITE,
-    # OPALITE,
-    COPPER_BAR,
-    IRON_BAR,
-    LEAD_BAR,
-    SILICON_BAR,
-    ALUMINUM_BAR,
-    SILVER_BAR,
-    GOLD_BAR,
-    BRONZE_BAR,
-    STEEL_BAR,
-    PLATINUM_BAR,
-    TITANIUM_BAR,
-    IRIDIUM_BAR,
-    PALLADIUM_BAR,
-    OSMIUM_BAR,
-    # RHODIUM_BAR,
-    # INERTON_ALLOY,
-    # QUADIUM_ALLOY,
-    # SCRITH_ALLOY,
-    # URU_ALLOY,
-    # VIBRANIUM_ALLOY,
-    # AETHER_ALLOY,
-    # VITERIUM_ALLOY,
-    # XYNIUM_ALLOY,
-    # QUOLIUM_ALLOY,
-    # LUTERIUM_ALLOY,
-    # WRAITH_ALLOY,
-    # AQUALITE_ALLOY,
-    # OPALITE_ALLOY,
-    COPPER_WIRE,
-    IRON_NAILS,
-    BATTERY,
-    HAMMER,
-    GLASS,
-    CIRCUIT,
-    LENS,
-    LASER,
-    BASIC_COMPUTER,
-    SOLAR_PANEL,
-    LASER_TORCH,
-    ADVANCED_BATTERY,
-    THERMAL_SCANNER,
-    ADVANCED_COMPUTER,
-    NAVIGATION_MODULE,
-    PLASMA_TORCH,
-    RADIO_TOWER,
-    # TELESCOPE,
-    # SATELLITE_DISH,
-    # MOTOR,
-    # ACCUMULATOR,
-    # NUCLEAR_CAPSULE,
-    # WIND_TURBINE,
-    # SPACE_PROBE,
-    # NUCLEAR_REACTOR,
-    # COLLIDER,
-    # GRAVITY_CHAMBER,
-    # ROBOT,
-    # FUSION_CAPSULE,
-    # TELEPORTER,
-    # FUSION_REACTOR,
-    # SUBSPACE_RELAY,
-    # ADVANCED_ROBOT,
-    # ADVANCED_TELEPORTER,
-    # QUANTUM_CPU,
-    # DEFLECTOR_SHIELD,
-    # WARP_CORE,
-    # DEEP_SPACE_SCANNER,
-    # ANTIMATTER_CELL,
-    # ATMOSPHERIC_PROCESSOR,
-    # ORBITAL_DOCK,
-    # SOLAR_COLLECTOR,
-    # PHASE_GATE,
-    # NEURAL_MATRIX,
-]
+profits = []
+for s in SELLABLES:
+    profits.append((s.get_profit_per_second(), s.name))
+profits.sort(reverse=True)
+for p, s in profits:
+    print(f"{p:.2f}\t{s}")
