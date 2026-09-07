@@ -24,7 +24,17 @@ class Sellable:
 
     def get_sell_price(self) -> float:
         # Each star adds 20% to the sell price
-        return self.base_sell_price * (1 + 0.2 * self.stars)
+        star_bonus = (1 + 0.2 * self.stars)
+        project_bonus = 1 if self.is_ore() else 1.44 # what is this?
+        station_bonus = 1 if self.is_ore() else 1.04
+        sales_room_bonus = 1 if self.is_ore() else 1.45
+        return (
+            self.base_sell_price *
+            star_bonus *
+            project_bonus *
+            station_bonus *
+            sales_room_bonus
+        )
 
     def get_total_time_to_create(self):
         time_to_create_ingredients = 0
