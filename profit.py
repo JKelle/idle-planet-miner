@@ -26,9 +26,6 @@ class Sellable:
         # Each star adds 20% to the sell price
         return self.base_sell_price * (1 + 0.2 * self.stars)
 
-    def get_input_costs(self) -> tuple[float, int]:
-        """Returns sell_price and smelt time (in seconds)"""
-
     def get_total_time_to_create(self):
         time_to_create_ingredients = 0
         for child, amount in self.ingredients:
