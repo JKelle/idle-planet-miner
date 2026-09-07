@@ -164,22 +164,22 @@ for p, s in profits:
     print(f"{p:.2f}\t{s}")
 
 alloys = [s for s in SELLABLES[:ALLOYS_END] if s.smelt_time > 0]
-plt.figure()
-plt.bar([s.name for s in alloys], [s.get_profit_per_second() for s in alloys])
-plt.xlabel("Alloy")
-plt.ylabel("Profit per second ($)")
-plt.title("Alloy Profit per Second")
-plt.xticks(rotation=45, ha="right")
-plt.tight_layout()
-
 items = [s for s in SELLABLES[ALLOYS_END:] if s.smelt_time > 0]
-plt.figure()
-plt.bar([s.name for s in items], [s.get_profit_per_second() for s in items])
-plt.xlabel("Item")
-plt.ylabel("Profit per second ($)")
-plt.title("Item Profit per Second")
-plt.xticks(rotation=45, ha="right")
-plt.tight_layout()
 
+fig, axs = plt.subplots(2, 2, figsize=(16, 10))
+for col, (label, group) in enumerate([("Alloy", alloys), ("Item", items)]):
+    names = [s.name for s in group]
+    values = [s.get_profit_per_second() for s in group]
+    for row, yscale in enumerate(["linear", "log"]):
+        ax = axs[row][col]
+        ax.bar(names, values)
+        ax.set_yscale(yscale)
+        ax.set_xlabel(label)
+        ax.set_ylabel("Profit per second ($)")
+        ax.set_title(f"{label} Profit per Second ({yscale})")
+        ax.tick_params(axis="x", rotation=45)
+        for tick in ax.get_xticklabels():
+            tick.set_ha("right")
+plt.tight_layout()
 plt.show()
 
