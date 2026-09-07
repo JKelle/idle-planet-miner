@@ -164,20 +164,22 @@ for p, s in profits:
     print(f"{p:.2f}\t{s}")
 
 alloys = [s for s in SELLABLES[:ALLOYS_END] if s.smelt_time > 0]
+plt.figure()
 plt.bar([s.name for s in alloys], [s.get_profit_per_second() for s in alloys])
 plt.xlabel("Alloy")
 plt.ylabel("Profit per second ($)")
 plt.title("Alloy Profit per Second")
 plt.xticks(rotation=45, ha="right")
 plt.tight_layout()
-plt.show()
 
 items = [s for s in SELLABLES[ALLOYS_END:] if s.smelt_time > 0]
+plt.figure()
 plt.bar([s.name for s in items], [s.get_profit_per_second() for s in items])
 plt.xlabel("Item")
 plt.ylabel("Profit per second ($)")
 plt.title("Item Profit per Second")
 plt.xticks(rotation=45, ha="right")
 plt.tight_layout()
+
 plt.show()
 
