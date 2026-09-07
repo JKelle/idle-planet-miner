@@ -21,7 +21,7 @@ class Sellable:
         for sellable, amount in self.inputs:
             money, time = sellable.get_input_cost()
             input_cost += money * amount
-            input_time += time * amount
+            input_time += (sellable.time_to_make + time) * amount
         return input_cost, input_time
 
     def get_profit_per_second(self):
