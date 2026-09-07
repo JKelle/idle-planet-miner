@@ -18,27 +18,38 @@ class Sellable:
         self.stars = stars
         SELLABLES.append(self)
 
+    def is_ore(self) -> bool:
+        # hack
+        return self.smelt_time == 0
+
     def get_sell_price(self) -> float:
         # Each star adds 20% to the sell price
         return self.base_sell_price * (1 + 0.2 * self.stars)
 
     def get_input_costs(self) -> tuple[float, int]:
         """Returns sell_price and smelt time (in seconds)"""
-        ing_sell_price = 0
-        ing_smelt_time = 0
-        for ing, amount in self.ingredients:
-            ing_sell_price += ing.get_sell_price() * amount
-            ing_smelt_time += ing.smelt_time * amount
 
-        return ing_sell_price, ing_smelt_time
+    def get_total_time_to_create(self):
+        time_to_create_ingredients = 0
+        for child, amount in self.ingredients:
+            time_to_create_ingredients += child.get_total_time_to_create() * amount
+        return time_to_create_ingredients + self.smelt_time
+
+    def get_net_ingredient_material_cost(self):
+        # Only count the raw ore cost (recursively) because adding the value of the alloy/item ingredients
+        # cancels out when we subtract it to consume it for upstream alloys/items.
+        ingredient_material_cost = 0
+        for child, amount in self.ingredients:
+            if child.is_ore():
+                ingredient_material_cost += child.get_sell_price() * amount
+            else:
+                ingredient_material_cost += child.get_net_ingredient_material_cost() * amount
+        return ingredient_material_cost
 
     def get_profit_per_second(self):
         """Returns units of dollars per second"""
-        ing_sell_price, ing_smelt_time = self.get_input_costs()
-        profit = self.get_sell_price() - ing_sell_price
-        total_smelt_time = ing_smelt_time + self.smelt_time
-
-        return profit / total_smelt_time
+        profit = self.get_sell_price() - self.get_net_ingredient_material_cost()
+        return profit / self.get_total_time_to_create()
 
 SELLABLES: list[Sellable] = []
 
