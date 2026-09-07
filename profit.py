@@ -26,11 +26,15 @@ class Sellable:
     def _get_sales_room_bonus(self) -> float:
         raise NotImplementedError()
 
+    def _get_market_boost(self) -> float:
+        return MARKET_BOOSTS.get(self.name, 1.0)
+
     def get_sell_price(self) -> float:
         # Each star adds 20% to the sell price
         star_bonus = (1 + 0.2 * self.stars)
         return (
             self.base_sell_price *
+            self._get_market_boost() *
             star_bonus *
             self._get_project_bonus() *
             self._get_station_bonus() *
@@ -218,6 +222,12 @@ RADIO_TOWER = Item("Radio Tower", 1_450_000_000, [(PLATINUM_BAR, 32), (ALUMINUM_
 # SOLAR_COLLECTOR = Item("Solar Collector", 2_800_000_000_000_000_000_000_000_000_000, [(SOLAR_PANEL, 1_000), (DEFLECTOR_SHIELD, 20), (DEEP_SPACE_SCANNER, 132)], time_to_make=399_000)
 # PHASE_GATE = Item("Phase Gate", 452_000_000_000_000_000_000_000_000_000_000, [(DEEP_SPACE_SCANNER, 100), (ADVANCED_TELEPORTER, 1_000), (ORBITAL_DOCK, 1)], time_to_make=699_000)
 # NEURAL_MATRIX = Item("Neural Matrix", 452_000_000_000_000_000_000_000_000_000_000, [(ANTIMATTER_CELL, 4), (SOLAR_COLLECTOR, 1), (OSMIUM_BAR, 16_000)], time_to_make=699_000)
+
+MARKET_BOOSTS = {
+    PALLADIUM.name: 2.0,
+    # INERTON.name: 3.0,
+}
+
 
 profits = []
 for s in ALLOYS + ITEMS:
