@@ -14,7 +14,7 @@ class Sellable:
         self.time_to_make = time_to_make
         SELLABLES.append(self)
 
-    def get_input_cost(self) -> tuple(float, int):
+    def get_input_cost(self) -> tuple[float, int]:
         """Returns price and time (in seconds)"""
         input_cost = 0
         input_time = 0
