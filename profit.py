@@ -191,5 +191,23 @@ for col, (label, group) in enumerate([("Alloy", alloys), ("Item", items)]):
         for tick in ax.get_xticklabels():
             tick.set_ha("right")
 plt.tight_layout()
+
+combined = sorted(alloys + items, key=lambda s: s.get_profit_per_second(), reverse=True)
+combined_names = [s.name for s in combined]
+combined_values = [s.get_profit_per_second() for s in combined]
+
+fig2, axs2 = plt.subplots(2, 1, figsize=(16, 10))
+for ax, yscale in zip(axs2, ["linear", "log"]):
+    bars = ax.bar(combined_names, combined_values)
+    ax.bar_label(bars, labels=[format_money_per_sec(v) for v in combined_values], fontsize=7)
+    ax.set_yscale(yscale)
+    ax.set_xlabel("Sellable")
+    ax.set_ylabel("Profit per second ($)")
+    ax.set_title(f"Alloy & Item Profit per Second ({yscale})")
+    ax.tick_params(axis="x", rotation=45)
+    for tick in ax.get_xticklabels():
+        tick.set_ha("right")
+plt.tight_layout()
+
 plt.show()
 
