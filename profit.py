@@ -163,6 +163,15 @@ profits.sort(reverse=True)
 for p, s in profits:
     print(f"{p:.2f}\t{s}")
 
+def format_money_per_sec(value: float) -> str:
+    """Formats a $/s value with a K/M/B/T suffix, rounded to 3 sig figs."""
+    sign = "-" if value < 0 else ""
+    abs_value = abs(value)
+    for threshold, suffix in [(1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")]:
+        if abs_value >= threshold:
+            return f"{sign}${abs_value / threshold:.3g}{suffix}/s"
+    return f"{sign}${abs_value:.3g}/s"
+
 alloys = [s for s in SELLABLES[:ALLOYS_END] if s.smelt_time > 0]
 items = [s for s in SELLABLES[ALLOYS_END:] if s.smelt_time > 0]
 
@@ -172,7 +181,8 @@ for col, (label, group) in enumerate([("Alloy", alloys), ("Item", items)]):
     values = [s.get_profit_per_second() for s in group]
     for row, yscale in enumerate(["linear", "log"]):
         ax = axs[row][col]
-        ax.bar(names, values)
+        bars = ax.bar(names, values)
+        ax.bar_label(bars, labels=[format_money_per_sec(v) for v in values], fontsize=7)
         ax.set_yscale(yscale)
         ax.set_xlabel(label)
         ax.set_ylabel("Profit per second ($)")
