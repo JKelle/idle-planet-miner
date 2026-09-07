@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional
+import matplotlib.pyplot as plt
 
 class Sellable:
     def __init__(
@@ -41,6 +42,9 @@ class Sellable:
 
 SELLABLES: list[Sellable] = []
 
+########
+# Ores #
+########
 COPPER = Sellable("Copper Ore", 1, stars=2)
 IRON = Sellable("Iron Ore", 2, stars=5)
 LEAD = Sellable("Lead Ore", 4, stars=2)
@@ -69,6 +73,9 @@ INERTON = Sellable("Inerton", 40_000, stars=0)
 # AQUALITE = Sellable("Aqualite", 4_300_000_000)
 # OPALITE = Sellable("Opalite", 18_000_000_000)
 
+##########
+# ALLOYS #
+##########
 COPPER_BAR = Sellable("Copper Bar", 1_450, [(COPPER, 1_000)], smelt_time=20, stars=0)
 IRON_BAR = Sellable("Iron Bar", 3_000, [(IRON, 1_000)], smelt_time=30, stars=6)
 LEAD_BAR = Sellable("Lead Bar", 6_100, [(LEAD, 1_000)], smelt_time=40, stars=5)
@@ -98,6 +105,9 @@ INERTON_ALLOY = Sellable("Inerton Alloy", 68_000_000, [(PALLADIUM_BAR, 2), (INER
 # AQUALITE_ALLOY = Sellable("Aqualite Alloy", 17_500_000_000_000, [(QUOLIUM_ALLOY, 5), (AQUALITE, 1_500)], smelt_time=4_980)
 # OPALITE_ALLOY = Sellable("Opalite Alloy", 277_000_000_000_000, [(WRAITH_ALLOY, 5), (OPALITE, 1_500)], smelt_time=5_520)
 
+#########
+# ITEMS #
+#########
 # COPPER_WIRE = Sellable("Copper Wire", 10_000, [(COPPER_BAR, 5)], time_to_make=60)
 # IRON_NAILS = Sellable("Iron Nails", 20_000, [(IRON_BAR, 5)], time_to_make=120)
 # BATTERY = Sellable("Battery", 70_000, [(COPPER_WIRE, 2), (COPPER_BAR, 10)], time_to_make=240)
@@ -150,3 +160,13 @@ for s in SELLABLES:
 profits.sort(reverse=True)
 for p, s in profits:
     print(f"{p:.2f}\t{s}")
+
+alloys = [s for s in SELLABLES if s.smelt_time > 0]
+plt.bar([s.name for s in alloys], [s.get_profit_per_second() for s in alloys])
+plt.xlabel("Alloy")
+plt.ylabel("Profit per second ($)")
+plt.title("Alloy Profit per Second")
+plt.xticks(rotation=45, ha="right")
+plt.tight_layout()
+plt.show()
+
