@@ -5,22 +5,22 @@ class Sellable:
     def __init__(
         self,
         name: str,
-        price: float,
+        sell_price: float,
         ingredients: Optional[list[tuple[Sellable, int]]] = None, # list of (sellable, amount) tuples
         smelt_time: int = 0, # number of seconds
     ):
         self.name = name
-        self.price = price
+        self.sell_price = sell_price
         self.ingredients = ingredients or []
         self.smelt_time = smelt_time
         SELLABLES.append(self)
 
     def get_input_costs(self) -> tuple[float, int]:
-        """Returns price and smelt time (in seconds)"""
+        """Returns sell_price and smelt time (in seconds)"""
         ing_sell_price = 0
         ing_smelt_time = 0
         for ing, amount in self.ingredients:
-            ing_sell_price += ing.price * amount
+            ing_sell_price += ing.sell_price * amount
             ing_smelt_time += ing.smelt_time * amount
 
         return ing_sell_price, ing_smelt_time
@@ -28,7 +28,7 @@ class Sellable:
     def get_profit_per_second(self):
         """Returns units of dollars per second"""
         ing_sell_price, ing_smelt_time = self.get_input_costs()
-        profit = self.price - ing_sell_price
+        profit = self.sell_price - ing_sell_price
         total_smelt_time = ing_smelt_time + self.smelt_time
 
         return profit / total_smelt_time
