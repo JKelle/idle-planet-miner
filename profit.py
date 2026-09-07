@@ -5,22 +5,28 @@ class Sellable:
     def __init__(
         self,
         name: str,
-        sell_price: float,
+        base_sell_price: float,
         ingredients: Optional[list[tuple[Sellable, int]]] = None, # list of (sellable, amount) tuples
         smelt_time: int = 0, # number of seconds
+        stars: int = 0,
     ):
         self.name = name
-        self.sell_price = sell_price
+        self.base_sell_price = base_sell_price
         self.ingredients = ingredients or []
         self.smelt_time = smelt_time
+        self.stars = stars
         SELLABLES.append(self)
+
+    def get_sell_price(self) -> float:
+        # Each star adds 20% to the sell price
+        return self.base_sell_price * (1 + 0.2 * self.stars)
 
     def get_input_costs(self) -> tuple[float, int]:
         """Returns sell_price and smelt time (in seconds)"""
         ing_sell_price = 0
         ing_smelt_time = 0
         for ing, amount in self.ingredients:
-            ing_sell_price += ing.sell_price * amount
+            ing_sell_price += ing.get_sell_price() * amount
             ing_smelt_time += ing.smelt_time * amount
 
         return ing_sell_price, ing_smelt_time
@@ -28,28 +34,28 @@ class Sellable:
     def get_profit_per_second(self):
         """Returns units of dollars per second"""
         ing_sell_price, ing_smelt_time = self.get_input_costs()
-        profit = self.sell_price - ing_sell_price
+        profit = self.get_sell_price() - ing_sell_price
         total_smelt_time = ing_smelt_time + self.smelt_time
 
         return profit / total_smelt_time
 
 SELLABLES: list[Sellable] = []
 
-COPPER = Sellable("Copper Ore", 1)
-IRON = Sellable("Iron Ore", 2)
-LEAD = Sellable("Lead Ore", 4)
-SILICON = Sellable("Silicon Ore", 8)
-ALUMINUM = Sellable("Aluminum Ore", 17)
-SILVER = Sellable("Silver Ore", 36)
-GOLD = Sellable("Gold Ore", 75)
-DIAMOND = Sellable("Diamond Ore", 160)
-PLATINUM = Sellable("Platinum Ore", 340)
-TITANIUM = Sellable("Titanium Ore", 730)
-IRIDIUM = Sellable("Iridium Ore", 1_600)
-PALLADIUM = Sellable("Palladium Ore", 3_500)
-OSMIUM = Sellable("Osmium Ore", 7_800)
-# RHODIUM = Sellable("Rhodium", 17_500)
-# INERTON = Sellable("Inerton", 40_000)
+COPPER = Sellable("Copper Ore", 1, stars=2)
+IRON = Sellable("Iron Ore", 2, stars=5)
+LEAD = Sellable("Lead Ore", 4, stars=2)
+SILICON = Sellable("Silicon Ore", 8, stars=2)
+ALUMINUM = Sellable("Aluminum Ore", 17, stars=4)
+SILVER = Sellable("Silver Ore", 36, stars=1)
+GOLD = Sellable("Gold Ore", 75, stars=3)
+DIAMOND = Sellable("Diamond Ore", 160, stars=2)
+PLATINUM = Sellable("Platinum Ore", 340, stars=7)
+TITANIUM = Sellable("Titanium Ore", 730, stars=4)
+IRIDIUM = Sellable("Iridium Ore", 1_600, stars=3)
+PALLADIUM = Sellable("Palladium Ore", 3_500, stars=5)
+OSMIUM = Sellable("Osmium Ore", 7_800, stars=1)
+RHODIUM = Sellable("Rhodium", 17_500, stars=0)
+INERTON = Sellable("Inerton", 40_000, stars=0)
 # QUADIUM = Sellable("Quadium", 92_000)
 # SCRITH = Sellable("Scrith", 215_000)
 # URU = Sellable("Uru", 510_000)
@@ -63,22 +69,22 @@ OSMIUM = Sellable("Osmium Ore", 7_800)
 # AQUALITE = Sellable("Aqualite", 4_300_000_000)
 # OPALITE = Sellable("Opalite", 18_000_000_000)
 
-COPPER_BAR = Sellable("Copper Bar", 1_450, [(COPPER, 1_000)], smelt_time=20)
-IRON_BAR = Sellable("Iron Bar", 3_000, [(IRON, 1_000)], smelt_time=30)
-LEAD_BAR = Sellable("Lead Bar", 6_100, [(LEAD, 1_000)], smelt_time=40)
-SILICON_BAR = Sellable("Silicon Bar", 12_500, [(SILICON, 1_000)], smelt_time=60)
-ALUMINUM_BAR = Sellable("Aluminum Bar", 27_600, [(ALUMINUM, 1_000)], smelt_time=80)
-SILVER_BAR = Sellable("Silver Bar", 60_000, [(SILVER, 1_000)], smelt_time=120)
-GOLD_BAR = Sellable("Gold Bar", 120_000, [(GOLD, 1_000)], smelt_time=180)
-BRONZE_BAR = Sellable("Bronze Bar", 234_000, [(SILVER_BAR, 2), (COPPER_BAR, 10)], smelt_time=240)
-STEEL_BAR = Sellable("Steel Bar", 340_000, [(LEAD_BAR, 15), (IRON_BAR, 30)], smelt_time=480)
-PLATINUM_BAR = Sellable("Platinum Bar", 780_000, [(GOLD_BAR, 2), (PLATINUM, 1_000)], smelt_time=600)
-TITANIUM_BAR = Sellable("Titanium Bar", 1_630_000, [(BRONZE_BAR, 2), (TITANIUM, 1_000)], smelt_time=720)
-IRIDIUM_BAR = Sellable("Iridium Bar", 3_110_000, [(STEEL_BAR, 2), (IRIDIUM, 1_000)], smelt_time=840)
-PALLADIUM_BAR = Sellable("Palladium Bar", 7_000_000, [(PLATINUM_BAR, 2), (PALLADIUM, 1_000)], smelt_time=960)
-OSMIUM_BAR = Sellable("Osmium Bar", 14_500_000, [(TITANIUM_BAR, 2), (OSMIUM, 1_000)], smelt_time=1_080)
-# RHODIUM_BAR = Sellable("Rhodium Bar", 31_000_000, [(IRIDIUM_BAR, 2), (RHODIUM, 1_000)], smelt_time=1_200)
-# INERTON_ALLOY = Sellable("Inerton Alloy", 68_000_000, [(PALLADIUM_BAR, 2), (INERTON, 1_000)], smelt_time=1_440)
+COPPER_BAR = Sellable("Copper Bar", 1_450, [(COPPER, 1_000)], smelt_time=20, stars=0)
+IRON_BAR = Sellable("Iron Bar", 3_000, [(IRON, 1_000)], smelt_time=30, stars=6)
+LEAD_BAR = Sellable("Lead Bar", 6_100, [(LEAD, 1_000)], smelt_time=40, stars=5)
+SILICON_BAR = Sellable("Silicon Bar", 12_500, [(SILICON, 1_000)], smelt_time=60, stars=4)
+ALUMINUM_BAR = Sellable("Aluminum Bar", 27_600, [(ALUMINUM, 1_000)], smelt_time=80, stars=2)
+SILVER_BAR = Sellable("Silver Bar", 60_000, [(SILVER, 1_000)], smelt_time=120, stars=4)
+GOLD_BAR = Sellable("Gold Bar", 120_000, [(GOLD, 1_000)], smelt_time=180, stars=7)
+BRONZE_BAR = Sellable("Bronze Bar", 234_000, [(SILVER_BAR, 2), (COPPER_BAR, 10)], smelt_time=240, stars=1)
+STEEL_BAR = Sellable("Steel Bar", 340_000, [(LEAD_BAR, 15), (IRON_BAR, 30)], smelt_time=480, stars=2)
+PLATINUM_BAR = Sellable("Platinum Bar", 780_000, [(GOLD_BAR, 2), (PLATINUM, 1_000)], smelt_time=600, stars=4)
+TITANIUM_BAR = Sellable("Titanium Bar", 1_630_000, [(BRONZE_BAR, 2), (TITANIUM, 1_000)], smelt_time=720, stars=6)
+IRIDIUM_BAR = Sellable("Iridium Bar", 3_110_000, [(STEEL_BAR, 2), (IRIDIUM, 1_000)], smelt_time=840, stars=1)
+PALLADIUM_BAR = Sellable("Palladium Bar", 7_000_000, [(PLATINUM_BAR, 2), (PALLADIUM, 1_000)], smelt_time=960, stars=1)
+OSMIUM_BAR = Sellable("Osmium Bar", 14_500_000, [(TITANIUM_BAR, 2), (OSMIUM, 1_000)], smelt_time=1_080, stars=4)
+RHODIUM_BAR = Sellable("Rhodium Bar", 31_000_000, [(IRIDIUM_BAR, 2), (RHODIUM, 1_000)], smelt_time=1_200, stars=2)
+INERTON_ALLOY = Sellable("Inerton Alloy", 68_000_000, [(PALLADIUM_BAR, 2), (INERTON, 1_000)], smelt_time=1_440, stars=2)
 # QUADIUM_ALLOY = Sellable("Quadium Alloy", 152_000_000, [(OSMIUM_BAR, 2), (QUADIUM, 1_000)], smelt_time=1_680)
 # SCRITH_ALLOY = Sellable("Scrith Alloy", 352_000_000, [(RHODIUM_BAR, 2), (SCRITH, 1_000)], smelt_time=1_920)
 # URU_ALLOY = Sellable("Uru Alloy", 832_000_000, [(INERTON_ALLOY, 2), (URU, 1_000)], smelt_time=2_160)
