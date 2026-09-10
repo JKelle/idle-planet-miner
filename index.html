@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Idle Planet Miner — Profitability Explorer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Profitability Explorer</h1>
+    <p class="tagline">
+      Edit your in-game stats and see which alloy or item is most profitable to
+      smelt or craft, per second.
+    </p>
+  </header>
+
+  <main>
+    <section class="card controls-card" aria-label="Chart controls">
+      <div class="control-group" role="group" aria-label="Axis scale">
+        <span class="control-label">Axis scale</span>
+        <div class="segmented" id="scale-control">
+          <button type="button" data-value="linear" class="active">Linear</button>
+          <button type="button" data-value="logarithmic">Log</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="sort-control">Sort by</label>
+        <select id="sort-control">
+          <option value="profit-desc">Profit / sec — high to low</option>
+          <option value="profit-asc">Profit / sec — low to high</option>
+          <option value="name-asc">Name — A to Z</option>
+          <option value="name-desc">Name — Z to A</option>
+        </select>
+      </div>
+
+      <div class="control-group" role="group" aria-label="Category filter">
+        <span class="control-label">Show</span>
+        <div class="segmented" id="category-control">
+          <button type="button" data-value="all" class="active">All</button>
+          <button type="button" data-value="alloy">Alloys</button>
+          <button type="button" data-value="item">Items</button>
+        </div>
+      </div>
+
+      <button type="button" id="reset-all" class="btn-secondary">
+        Reset all to defaults
+      </button>
+    </section>
+
+    <section class="card chart-card" aria-label="Profit per second chart">
+      <div class="chart-legend" id="chart-legend"></div>
+      <div class="chart-scroll">
+        <div class="chart-canvas-wrap" id="chart-canvas-wrap">
+          <canvas id="profit-chart"></canvas>
+        </div>
+      </div>
+      <p class="chart-note" id="chart-note" aria-live="polite"></p>
+    </section>
+
+    <div class="panels">
+      <section class="card edit-card" aria-label="Edit entity stats">
+        <h2>Edit stats</h2>
+        <div id="edit-empty" class="edit-empty">
+          Click a bar in the chart, or an entity name below, to edit its stats.
+        </div>
+        <form id="edit-form" class="edit-form" hidden>
+          <div class="edit-head">
+            <div>
+              <span id="edit-name" class="edit-name"></span>
+              <span id="edit-category" class="pill"></span>
+            </div>
+            <button type="button" id="edit-reset" class="btn-link">
+              Reset this entity
+            </button>
+          </div>
+
+          <div class="field">
+            <label for="edit-stars">Stars</label>
+            <input type="number" id="edit-stars" min="0" step="1" inputmode="numeric" />
+            <span class="field-error" id="err-stars"></span>
+          </div>
+          <div class="field">
+            <label for="edit-price">Base sell price</label>
+            <input type="number" id="edit-price" min="0" step="any" inputmode="decimal" />
+            <span class="field-error" id="err-price"></span>
+          </div>
+          <div class="field" id="field-smelt">
+            <label for="edit-smelt">Smelt time (seconds)</label>
+            <input type="number" id="edit-smelt" min="0" step="any" inputmode="decimal" />
+            <span class="field-hint" id="hint-smelt"></span>
+            <span class="field-error" id="err-smelt"></span>
+          </div>
+          <div class="field">
+            <label for="edit-boost">Market boost (×)</label>
+            <input type="number" id="edit-boost" min="0" step="any" inputmode="decimal" />
+            <span class="field-error" id="err-boost"></span>
+          </div>
+
+          <dl class="derived" id="edit-derived" aria-live="polite"></dl>
+        </form>
+      </section>
+
+      <section class="card ores-card" aria-label="Ore stats">
+        <h2>Ores</h2>
+        <p class="card-sub">Ores have no craft time, so they never appear in the chart. Edit them here.</p>
+        <div class="table-scroll">
+          <table class="ore-table">
+            <thead>
+              <tr>
+                <th scope="col">On</th>
+                <th scope="col">Ore</th>
+                <th scope="col">Stars</th>
+                <th scope="col">Base price</th>
+                <th scope="col">Boost ×</th>
+                <th scope="col">Sell price</th>
+              </tr>
+            </thead>
+            <tbody id="ore-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section class="card unlock-card" aria-label="Unlocked tiers">
+      <h2>Unlocked tiers</h2>
+      <p class="card-sub">
+        Tick entities on as you unlock them in-game. Turning one on also turns on
+        everything it needs; turning one off also turns off anything that needs it.
+      </p>
+      <div class="unlock-columns">
+        <div>
+          <h3>Alloys</h3>
+          <ul id="unlock-alloys" class="unlock-list"></ul>
+        </div>
+        <div>
+          <h3>Items</h3>
+          <ul id="unlock-items" class="unlock-list"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="vendor/chart.umd.js"></script>
+  <script src="data.js"></script>
+  <script src="model.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
