@@ -59,85 +59,71 @@
       <p class="chart-note" id="chart-note" aria-live="polite"></p>
     </section>
 
-    <div class="panels">
-      <section class="card edit-card" aria-label="Edit entity stats">
-        <h2>Edit stats</h2>
-        <div id="edit-empty" class="edit-empty">
-          Click a bar in the chart, or an entity name below, to edit its stats.
-        </div>
-        <form id="edit-form" class="edit-form" hidden>
-          <div class="edit-head">
-            <div>
-              <span id="edit-name" class="edit-name"></span>
-              <span id="edit-category" class="pill"></span>
-            </div>
-            <button type="button" id="edit-reset" class="btn-link">
-              Reset this entity
-            </button>
-          </div>
-
-          <div class="field">
-            <label for="edit-stars">Stars</label>
-            <input type="number" id="edit-stars" min="0" step="1" inputmode="numeric" />
-            <span class="field-error" id="err-stars"></span>
-          </div>
-          <div class="field">
-            <label for="edit-price">Base sell price</label>
-            <input type="number" id="edit-price" min="0" step="any" inputmode="decimal" />
-            <span class="field-error" id="err-price"></span>
-          </div>
-          <div class="field" id="field-smelt">
-            <label for="edit-smelt">Smelt time (seconds)</label>
-            <input type="number" id="edit-smelt" min="0" step="any" inputmode="decimal" />
-            <span class="field-hint" id="hint-smelt"></span>
-            <span class="field-error" id="err-smelt"></span>
-          </div>
-          <div class="field">
-            <label for="edit-boost">Market boost (×)</label>
-            <input type="number" id="edit-boost" min="0" step="any" inputmode="decimal" />
-            <span class="field-error" id="err-boost"></span>
-          </div>
-
-          <dl class="derived" id="edit-derived" aria-live="polite"></dl>
-        </form>
-      </section>
-
-      <section class="card ores-card" aria-label="Ore stats">
-        <h2>Ores</h2>
-        <p class="card-sub">Ores have no craft time, so they never appear in the chart. Edit them here.</p>
-        <div class="table-scroll">
-          <table class="ore-table">
-            <thead>
-              <tr>
-                <th scope="col">On</th>
-                <th scope="col">Ore</th>
-                <th scope="col">Stars</th>
-                <th scope="col">Base price</th>
-                <th scope="col">Boost ×</th>
-                <th scope="col">Sell price</th>
-              </tr>
-            </thead>
-            <tbody id="ore-tbody"></tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-
-    <section class="card unlock-card" aria-label="Unlocked tiers">
-      <h2>Unlocked tiers</h2>
+    <section class="card stats-card" aria-label="Stats">
+      <h2>Stats</h2>
       <p class="card-sub">
-        Tick entities on as you unlock them in-game. Turning one on also turns on
-        everything it needs; turning one off also turns off anything that needs it.
+        Edit stars, base price, market boost, time, and ingredient amounts
+        inline. Ores have no craft time or ingredients and never appear in the
+        chart. Tick entities on as you unlock them in-game — turning one on also
+        turns on everything it needs; turning one off also turns off anything
+        that needs it.
       </p>
-      <div class="unlock-columns">
-        <div>
-          <h3>Alloys</h3>
-          <ul id="unlock-alloys" class="unlock-list"></ul>
-        </div>
-        <div>
-          <h3>Items</h3>
-          <ul id="unlock-items" class="unlock-list"></ul>
-        </div>
+
+      <h3>Ores</h3>
+      <div class="table-scroll">
+        <table class="stat-table">
+          <thead>
+            <tr>
+              <th scope="col">On</th>
+              <th scope="col" class="col-name">Ore</th>
+              <th scope="col">Stars</th>
+              <th scope="col">Base price</th>
+              <th scope="col">Boost ×</th>
+              <th></th>
+              <th></th>
+              <th scope="col">Sell price</th>
+            </tr>
+          </thead>
+          <tbody id="ore-tbody"></tbody>
+        </table>
+      </div>
+
+      <h3>Alloys</h3>
+      <div class="table-scroll">
+        <table class="stat-table">
+          <thead>
+            <tr>
+              <th scope="col">On</th>
+              <th scope="col" class="col-name">Alloy</th>
+              <th scope="col">Stars</th>
+              <th scope="col">Base price</th>
+              <th scope="col">Boost ×</th>
+              <th scope="col">Smelt time</th>
+              <th scope="col" class="col-ingredients">Ingredients</th>
+              <th scope="col">Sell price</th>
+            </tr>
+          </thead>
+          <tbody id="alloy-tbody"></tbody>
+        </table>
+      </div>
+
+      <h3>Items</h3>
+      <div class="table-scroll">
+        <table class="stat-table">
+          <thead>
+            <tr>
+              <th scope="col">On</th>
+              <th scope="col" class="col-name">Item</th>
+              <th scope="col">Stars</th>
+              <th scope="col">Base price</th>
+              <th scope="col">Boost ×</th>
+              <th scope="col">Craft time</th>
+              <th scope="col" class="col-ingredients">Ingredients</th>
+              <th scope="col">Sell price</th>
+            </tr>
+          </thead>
+          <tbody id="item-tbody"></tbody>
+        </table>
       </div>
     </section>
   </main>

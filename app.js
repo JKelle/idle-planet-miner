@@ -38,7 +38,6 @@
 
   // ---- state ----------------------------------------------------------------
   const state = loadState();
-  let selectedId = null;
   let chart = null;
   let currentRows = []; // [{ entity, value }] in chart order
 
@@ -67,6 +66,24 @@
           }
         }
         if (typeof ov.unlocked === "boolean") entry.unlocked = ov.unlocked;
+        if (ov.ingredients && typeof ov.ingredients === "object") {
+          const defAmounts = {};
+          for (const ing of DEFAULT_BY_ID[id].ingredients) {
+            defAmounts[ing.sellableId] = ing.amount;
+          }
+          const cleanIng = {};
+          for (const [sid, amt] of Object.entries(ov.ingredients)) {
+            if (
+              sid in defAmounts &&
+              typeof amt === "number" &&
+              Number.isInteger(amt) &&
+              amt >= 1
+            ) {
+              cleanIng[sid] = amt;
+            }
+          }
+          if (Object.keys(cleanIng).length) entry.ingredients = cleanIng;
+        }
         if (Object.keys(entry).length) clean[id] = entry;
       }
       return {
@@ -90,11 +107,15 @@
   function resolved(id) {
     const base = DEFAULT_BY_ID[id];
     const ov = state.overrides[id] || {};
+    const ovIng = ov.ingredients || {};
     const out = {
       id: base.id,
       name: base.name,
       category: base.category,
-      ingredients: base.ingredients,
+      ingredients: base.ingredients.map((i) => ({
+        sellableId: i.sellableId,
+        amount: pick(ovIng[i.sellableId], i.amount),
+      })),
       baseSellPrice: pick(ov.baseSellPrice, base.baseSellPrice),
       stars: pick(ov.stars, base.stars),
       smeltTimeSeconds: pick(ov.smeltTimeSeconds, base.smeltTimeSeconds),
@@ -131,10 +152,18 @@
     saveState();
   }
 
-  function resetEntityStats(id) {
-    const ov = state.overrides[id];
-    if (!ov) return;
-    for (const k of STAT_KEYS) delete ov[k];
+  function setIngredientAmount(id, sellableId, value) {
+    const defAmount = DEFAULT_BY_ID[id].ingredients.find(
+      (i) => i.sellableId === sellableId
+    ).amount;
+    const ov = (state.overrides[id] = state.overrides[id] || {});
+    const ing = (ov.ingredients = ov.ingredients || {});
+    if (value === defAmount) {
+      delete ing[sellableId];
+    } else {
+      ing[sellableId] = value;
+    }
+    if (Object.keys(ing).length === 0) delete ov.ingredients;
     pruneOverride(id);
     saveState();
   }
@@ -266,9 +295,6 @@
         indexAxis: "y",
         maintainAspectRatio: false,
         animation: false,
-        onClick: (evt, els) => {
-          if (els && els.length) openEditor(currentRows[els[0].index].entity.id);
-        },
         scales: {
           x: {
             type: isLog ? "logarithmic" : "linear",
@@ -316,114 +342,19 @@
       `<span><i style="background:${getVar("--accent-item")}"></i>Item</span>`;
   }
 
-  // ---- edit panel -----------------------------------------------------
-  function openEditor(id) {
-    selectedId = id;
-    const e = resolved(id);
-    document.getElementById("edit-empty").hidden = true;
-    const form = document.getElementById("edit-form");
-    form.hidden = false;
-
-    document.getElementById("edit-name").textContent = e.name;
-    document.getElementById("edit-category").textContent = e.category;
-
-    setInput("edit-stars", e.stars);
-    setInput("edit-price", e.baseSellPrice);
-    setInput("edit-smelt", e.smeltTimeSeconds);
-    setInput("edit-boost", e.marketBoost);
-
-    document.getElementById("field-smelt").style.display =
-      e.category === "ore" ? "none" : "";
-
-    clearErrors(form);
-    updateSmeltHint();
-    renderDerived();
+  // ---- stat tables --------------------------------------------------
+  function renderStatTables() {
+    renderStatTable("ore-tbody", "ore");
+    renderStatTable("alloy-tbody", "alloy");
+    renderStatTable("item-tbody", "item");
   }
 
-  function setInput(inputId, value) {
-    const el = document.getElementById(inputId);
-    el.value = String(value);
-    el.classList.remove("invalid");
-  }
-
-  function clearErrors(scope) {
-    scope.querySelectorAll(".field-error").forEach((s) => (s.textContent = ""));
-    scope.querySelectorAll("input").forEach((i) => i.classList.remove("invalid"));
-  }
-
-  const FIELD_RULES = {
-    "edit-stars": { key: "stars", integer: true, min: 0, label: "Stars" },
-    "edit-price": { key: "baseSellPrice", min: 0, label: "Base sell price" },
-    "edit-smelt": { key: "smeltTimeSeconds", min: 0, label: "Smelt time" },
-    "edit-boost": { key: "marketBoost", min: 0, exclusiveMin: true, label: "Market boost" },
-  };
-
-  function validateField(inputId) {
-    const rule = FIELD_RULES[inputId];
-    const el = document.getElementById(inputId);
-    const err = document.getElementById("err-" + inputId.split("-")[1]);
-    const raw = el.value.trim();
-    let msg = "";
-    const n = Number(raw);
-    if (raw === "" || Number.isNaN(n) || !isFinite(n)) {
-      msg = "Enter a number";
-    } else if (rule.integer && !Number.isInteger(n)) {
-      msg = "Must be a whole number";
-    } else if (rule.exclusiveMin && n <= rule.min) {
-      msg = `Must be greater than ${rule.min}`;
-    } else if (!rule.exclusiveMin && n < rule.min) {
-      msg = `Must be ${rule.min} or more`;
-    }
-    el.classList.toggle("invalid", !!msg);
-    err.textContent = msg;
-    return msg ? null : n;
-  }
-
-  function onEditInput(inputId) {
-    const val = validateField(inputId);
-    if (inputId === "edit-smelt") updateSmeltHint();
-    if (val === null || !selectedId) return;
-    setStat(selectedId, FIELD_RULES[inputId].key, val);
-    renderDerived();
-    renderChart();
-    renderOreTable(); // ore sell price may be shown there too
-  }
-
-  function updateSmeltHint() {
-    const raw = document.getElementById("edit-smelt").value.trim();
-    const n = Number(raw);
-    const hint = document.getElementById("hint-smelt");
-    hint.textContent =
-      raw !== "" && isFinite(n) && n >= 60 ? `= ${F().formatDuration(n)}` : "";
-  }
-
-  function renderDerived() {
-    if (!selectedId) return;
+  function renderStatTable(tbodyId, category) {
     const byId = resolvedMap();
-    const memos = F().newMemos();
-    const e = byId[selectedId];
-    const price = F().sellPrice(e);
-    const cost = F().netIngredientMaterialCost(e, byId, memos.cost);
-    const time = F().totalTimeToCreate(e, byId, memos.time);
-    const rows = [
-      ["Sell price", F().formatMoney(price)],
-      ["Ingredient cost", F().formatMoney(cost)],
-      ["Time to create", F().formatDuration(time)],
-    ];
-    if (e.category !== "ore") {
-      rows.push(["Profit / sec", F().formatMoneyPerSec((price - cost) / time)]);
-    }
-    document.getElementById("edit-derived").innerHTML = rows
-      .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
-      .join("");
-  }
-
-  // ---- ore table -----------------------------------------------------
-  function renderOreTable() {
-    const byId = resolvedMap();
-    const tbody = document.getElementById("ore-tbody");
+    const tbody = document.getElementById(tbodyId);
     tbody.innerHTML = "";
-    for (const base of DEFAULT_ENTITIES.filter((e) => e.category === "ore")) {
+    const isOre = category === "ore";
+    for (const base of DEFAULT_ENTITIES.filter((e) => e.category === category)) {
       const e = byId[base.id];
       const unlocked = isUnlocked(base.id);
       const tr = document.createElement("tr");
@@ -441,20 +372,30 @@
       tdOn.appendChild(cb);
 
       const tdName = cell(tr);
-      const nameBtn = document.createElement("button");
-      nameBtn.type = "button";
-      nameBtn.className = "ore-name-btn";
-      nameBtn.textContent = base.name;
-      nameBtn.addEventListener("click", () => openEditor(base.id));
-      tdName.appendChild(nameBtn);
+      tdName.className = "col-name";
+      tdName.textContent = base.name;
 
-      oreInput(tr, e, base.id, "stars", { integer: true });
-      oreInput(tr, e, base.id, "baseSellPrice", {});
-      oreInput(tr, e, base.id, "marketBoost", { exclusiveMin: true });
-
-      const tdPrice = cell(tr);
+      // Built up-front so stat inputs can patch it in place rather than
+      // forcing a full tbody rebuild (which would drop focus mid-typing).
+      const tdPrice = document.createElement("td");
       tdPrice.textContent = F().formatMoney(F().sellPrice(e));
+      const patchPrice = () => {
+        tdPrice.textContent = F().formatMoney(F().sellPrice(resolved(base.id)));
+      };
 
+      statInput(tr, e, base.id, "stars", { integer: true }, patchPrice);
+      statInput(tr, e, base.id, "baseSellPrice", {}, patchPrice);
+      statInput(tr, e, base.id, "marketBoost", { exclusiveMin: true }, patchPrice);
+
+      if (isOre) {
+        cell(tr); // time — not applicable to ores
+        cell(tr); // ingredients — not applicable to ores
+      } else {
+        statInput(tr, e, base.id, "smeltTimeSeconds", {}, null);
+        renderIngredientCell(tr, e, base.id);
+      }
+
+      tr.appendChild(tdPrice);
       tbody.appendChild(tr);
     }
   }
@@ -465,7 +406,7 @@
     return td;
   }
 
-  function oreInput(tr, entity, id, key, opts) {
+  function statInput(tr, entity, id, key, opts, patchPrice) {
     const td = cell(tr);
     const input = document.createElement("input");
     input.type = "number";
@@ -483,47 +424,48 @@
       input.classList.toggle("invalid", !ok);
       if (!ok) return;
       setStat(id, key, n);
-      td.parentElement.lastElementChild.textContent = F().formatMoney(
-        F().sellPrice(resolved(id))
-      );
+      if (patchPrice) patchPrice();
       renderChart();
-      if (selectedId) renderDerived();
     });
     td.appendChild(input);
   }
 
-  // ---- unlock lists -------------------------------------------------
-  function renderUnlockLists() {
-    fillUnlock("unlock-alloys", "alloy");
-    fillUnlock("unlock-items", "item");
-  }
+  function renderIngredientCell(tr, entity, id) {
+    const td = cell(tr);
+    td.className = "col-ingredients";
+    for (const ing of entity.ingredients) {
+      const child = DEFAULT_BY_ID[ing.sellableId];
+      const row = document.createElement("div");
+      row.className = "ing-row";
 
-  function fillUnlock(ulId, category) {
-    const ul = document.getElementById(ulId);
-    ul.innerHTML = "";
-    for (const base of DEFAULT_ENTITIES.filter((e) => e.category === category)) {
-      const unlocked = isUnlocked(base.id);
-      const li = document.createElement("li");
-      if (!unlocked) li.className = "is-locked";
+      const name = document.createElement("span");
+      name.className = "ing-name";
+      name.textContent = child.name;
 
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = unlocked;
-      cb.id = "unlock-" + base.id;
-      cb.addEventListener("change", () => {
-        setUnlocked(base.id, cb.checked);
-        renderAll();
+      const x = document.createElement("span");
+      x.className = "ing-x";
+      x.textContent = "×";
+
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "1";
+      input.step = "1";
+      input.value = String(ing.amount);
+      input.setAttribute("aria-label", `${entity.name} ${child.name} amount`);
+      input.addEventListener("input", () => {
+        const raw = input.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 1;
+        input.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        setIngredientAmount(id, ing.sellableId, n);
+        renderChart();
       });
 
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "name-btn";
-      btn.textContent = base.name;
-      btn.addEventListener("click", () => openEditor(base.id));
-
-      li.appendChild(cb);
-      li.appendChild(btn);
-      ul.appendChild(li);
+      row.appendChild(name);
+      row.appendChild(x);
+      row.appendChild(input);
+      td.appendChild(row);
     }
   }
 
@@ -543,25 +485,8 @@
     document.getElementById("reset-all").addEventListener("click", () => {
       if (!confirm("Reset every stat and unlock back to the game defaults?")) return;
       resetAll();
-      if (selectedId && !DEFAULT_BY_ID[selectedId]) selectedId = null;
-      closeEditorIfLocked();
       renderAll();
-      if (selectedId) openEditor(selectedId);
     });
-
-    document.getElementById("edit-reset").addEventListener("click", () => {
-      if (!selectedId) return;
-      resetEntityStats(selectedId);
-      openEditor(selectedId);
-      renderChart();
-      renderOreTable();
-    });
-
-    for (const inputId of Object.keys(FIELD_RULES)) {
-      document
-        .getElementById(inputId)
-        .addEventListener("input", () => onEditInput(inputId));
-    }
   }
 
   function segmented(containerId, controlKey) {
@@ -578,16 +503,10 @@
     }
   }
 
-  function closeEditorIfLocked() {
-    // editor stays open for any entity; nothing to do, but keep hook for clarity
-  }
-
   // ---- top-level render ------------------------------------------
   function renderAll() {
     renderChart();
-    renderOreTable();
-    renderUnlockLists();
-    if (selectedId) renderDerived();
+    renderStatTables();
   }
 
   renderLegend();
