@@ -10,7 +10,7 @@
   "use strict";
 
   const STORAGE_KEY = "ipm-explorer-v1";
-  const STAT_KEYS = ["stars", "baseSellPrice", "smeltTimeSeconds", "marketBoost"];
+  const STAT_KEYS = ["sellPrice", "smeltTimeSeconds", "marketBoost"];
 
   // model.js declares these as globals in the browser (classic script). Bridge
   // them onto one object so the rest of this file reads uniformly.
@@ -22,7 +22,11 @@
     newMemos,
     formatMoney,
     formatMoneyPerSec,
+    formatCompact,
+    parseCompact,
     formatDuration,
+    formatDurationCompact,
+    parseDuration,
   };
 
   const DEFAULT_BY_ID = {};
@@ -116,8 +120,7 @@
         sellableId: i.sellableId,
         amount: pick(ovIng[i.sellableId], i.amount),
       })),
-      baseSellPrice: pick(ov.baseSellPrice, base.baseSellPrice),
-      stars: pick(ov.stars, base.stars),
+      sellPrice: pick(ov.sellPrice, base.sellPrice),
       smeltTimeSeconds: pick(ov.smeltTimeSeconds, base.smeltTimeSeconds),
       marketBoost: pick(ov.marketBoost, base.marketBoost),
     };
@@ -375,27 +378,23 @@
       tdName.className = "col-name";
       tdName.textContent = base.name;
 
-      // Built up-front so stat inputs can patch it in place rather than
-      // forcing a full tbody rebuild (which would drop focus mid-typing).
-      const tdPrice = document.createElement("td");
-      tdPrice.textContent = F().formatMoney(F().sellPrice(e));
-      const patchPrice = () => {
-        tdPrice.textContent = F().formatMoney(F().sellPrice(resolved(base.id)));
-      };
-
-      statInput(tr, e, base.id, "stars", { integer: true }, patchPrice);
-      statInput(tr, e, base.id, "baseSellPrice", {}, patchPrice);
-      statInput(tr, e, base.id, "marketBoost", { exclusiveMin: true }, patchPrice);
+      statInput(tr, e, base.id, "marketBoost", { exclusiveMin: true });
 
       if (isOre) {
         cell(tr); // time — not applicable to ores
         cell(tr); // ingredients — not applicable to ores
       } else {
-        statInput(tr, e, base.id, "smeltTimeSeconds", {}, null);
+        statInput(tr, e, base.id, "smeltTimeSeconds", {
+          format: F().formatDurationCompact,
+          parse: F().parseDuration,
+        });
         renderIngredientCell(tr, e, base.id);
       }
 
-      tr.appendChild(tdPrice);
+      statInput(tr, e, base.id, "sellPrice", {
+        format: F().formatCompact,
+        parse: F().parseCompact,
+      });
       tbody.appendChild(tr);
     }
   }
@@ -406,17 +405,23 @@
     return td;
   }
 
-  function statInput(tr, entity, id, key, opts, patchPrice) {
+  function statInput(tr, entity, id, key, opts) {
     const td = cell(tr);
     const input = document.createElement("input");
-    input.type = "number";
-    input.min = "0";
-    input.step = opts.integer ? "1" : "any";
-    input.value = String(entity[key]);
+    if (opts.format) {
+      // text field so it can hold e.g. "3.05M" or "1h 5m"; opts.parse inverts it
+      input.type = "text";
+      input.value = opts.format(entity[key]);
+    } else {
+      input.type = "number";
+      input.min = "0";
+      input.step = opts.integer ? "1" : "any";
+      input.value = String(entity[key]);
+    }
     input.setAttribute("aria-label", `${entity.name} ${key}`);
     input.addEventListener("input", () => {
       const raw = input.value.trim();
-      const n = Number(raw);
+      const n = opts.parse ? opts.parse(raw) : Number(raw);
       let ok = raw !== "" && isFinite(n) && !Number.isNaN(n);
       if (ok && opts.integer && !Number.isInteger(n)) ok = false;
       if (ok && opts.exclusiveMin && n <= 0) ok = false;
@@ -424,7 +429,6 @@
       input.classList.toggle("invalid", !ok);
       if (!ok) return;
       setStat(id, key, n);
-      if (patchPrice) patchPrice();
       renderChart();
     });
     td.appendChild(input);

@@ -205,7 +205,7 @@ select {
 
 .stat-table {
   width: 100%;
-  min-width: 940px;
+  min-width: 760px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
@@ -223,32 +223,22 @@ select {
 
 .stat-table th:nth-child(3),
 .stat-table td:nth-child(3) {
-  width: 84px;
+  width: 90px;
 }
 
 .stat-table th:nth-child(4),
 .stat-table td:nth-child(4) {
-  width: 106px;
+  width: 100px;
 }
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 90px;
+  width: 216px;
 }
 
 .stat-table th:nth-child(6),
 .stat-table td:nth-child(6) {
-  width: 100px;
-}
-
-.stat-table th:nth-child(7),
-.stat-table td:nth-child(7) {
-  width: 216px;
-}
-
-.stat-table th:nth-child(8),
-.stat-table td:nth-child(8) {
-  width: 110px;
+  width: 120px;
 }
 
 .stat-table th,
@@ -280,6 +270,11 @@ select {
   border: 1px solid var(--border);
   border-radius: 6px;
   text-align: right;
+}
+
+/* Sell price is the main field to tune and its values run large. */
+.stat-table td:nth-child(6) input {
+  width: 100px;
 }
 
 .stat-table input.invalid {
