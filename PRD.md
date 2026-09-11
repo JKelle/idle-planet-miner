@@ -28,7 +28,7 @@ chart, with controls for axis scale, sort order, and category filtering.
 - No user accounts or multi-device sync.
 - No adding/removing ores, alloys, or items, or editing ingredient recipes/quantities — the entity set and recipe graph are fixed, ported as-is from `profit.py`.
 - No editing of project/station/sales-room bonus multipliers (these stay as fixed per-category constants, same as today).
-- No deployment/hosting step — runs locally for now (e.g. open `index.html` or run a local dev server).
+- ~~No deployment/hosting step — runs locally for now (e.g. open `index.html` or run a local dev server).~~ Done: deployed to GitHub Pages at https://jkelle.github.io/idle-planet-miner/.
 
 ## 4. Users
 
@@ -113,7 +113,7 @@ All three controls update the same chart in place — never multiple charts on s
 
 - Editable project/station/sales-room bonus levels.
 - Adding/removing ores/alloys/items or editing recipes.
-- Deployment to static hosting (GitHub Pages/Vercel/etc.).
+- ~~Deployment to static hosting (GitHub Pages/Vercel/etc.).~~ Done: deployed to GitHub Pages at https://jkelle.github.io/idle-planet-miner/.
 - Multi-user accounts / server-side persistence.
 - Additional chart types (e.g. cost breakdown, time-to-create comparisons).
 

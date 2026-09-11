@@ -18,7 +18,14 @@ improved iteratively rather than trying to model every mechanic up front.
 
 ## Commands
 
-There is no build/lint/test tooling yet. Run the existing script directly:
+There is no build/lint/test tooling. The web app is a static site with no
+build step — open `index.html` directly in a browser, or serve it locally:
+
+```
+python3 -m http.server
+```
+
+The original Python script still runs standalone:
 
 ```
 python3 profit.py
@@ -29,13 +36,19 @@ up matplotlib bar charts (requires `matplotlib` installed).
 
 ## Repository state
 
-- `profit.py` — the current implementation: a Python model of the game's
-  ores/alloys/items and a script that computes and plots profit-per-second.
-  This is the reference implementation for the game-economy math.
-- `PRD.md` — product requirements for turning `profit.py` into an
-  interactive static web app (editable stats, live-updating chart with
-  axis/sort/filter controls). No web app code exists yet — this is the spec
-  to build against.
+- `index.html` / `styles.css` / `data.js` / `model.js` / `app.js` — the web
+  app: an interactive, editable version of `profit.py`'s model with a
+  live-updating Chart.js chart. Deployed via GitHub Pages
+  (https://jkelle.github.io/idle-planet-miner/). Per-browser edits persist
+  in `localStorage`; there is no backend or server-side state.
+- `vendor/chart.umd.js` — Chart.js, vendored locally (not loaded from a CDN).
+- `profit.py` — the original Python model of the game's ores/alloys/items
+  and a script that computes and plots profit-per-second. Still the
+  reference implementation for the game-economy math, but no longer kept in
+  sync field-for-field with `data.js` (the web app dropped the
+  stars/base-price/bonus derivation in favor of one directly-editable sell
+  price per entity).
+- `PRD.md` — product requirements the web app was built against.
 
 ## Architecture (`profit.py`)
 
