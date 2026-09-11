@@ -324,3 +324,18 @@ a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ---- mobile ---- */
+@media (max-width: 640px) {
+  .site-header {
+    padding: 24px 16px 8px;
+  }
+
+  main {
+    padding: 16px 16px 48px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+}
