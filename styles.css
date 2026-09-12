@@ -142,9 +142,16 @@ select {
   color: var(--text);
 }
 
-.btn-secondary {
+.controls-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
   margin-left: auto;
   align-self: flex-end;
+}
+
+.btn-secondary {
   font: inherit;
   font-size: 0.9rem;
   padding: 8px 14px;
@@ -158,6 +165,11 @@ select {
 .btn-secondary:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.import-status {
+  font-size: 0.85rem;
+  color: var(--text-soft);
 }
 
 /* ---- chart ---- */

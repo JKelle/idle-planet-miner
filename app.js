@@ -12,6 +12,14 @@
   const STORAGE_KEY = "ipm-explorer-v1";
   const STAT_KEYS = ["sellPrice", "smeltTimeSeconds"];
 
+  // Bump this whenever a stat key is removed/renamed or an override's shape
+  // changes, and add a migration step in normalizeState below. Never change
+  // STORAGE_KEY itself (that would just orphan everyone's existing save under
+  // the old key) and never let unrecognized fields get silently dropped on
+  // load/save — that's how past deploys ("Editable sell price", "Remove
+  // market boost") ended up discarding players' saved edits.
+  const STORAGE_VERSION = 2;
+
   // model.js declares these as globals in the browser (classic script). Bridge
   // them onto one object so the rest of this file reads uniformly.
   window.__model = {
@@ -52,6 +60,11 @@
 
   // ---- state ----------------------------------------------------------------
   const state = loadState();
+  // Write the normalized/migrated shape straight back — otherwise a legacy
+  // blob just sits in localStorage as-is until the player's next edit
+  // happens to trigger a save, and a crash or tab close before that loses
+  // the migration.
+  saveState();
   let chart = null;
   let currentRows = []; // [{ entity, value }] in chart order
 
@@ -59,53 +72,56 @@
     return { scale: "linear", sort: "profit-desc", category: "all" };
   }
 
+  // Normalize a parsed (or freshly-imported) state blob: validate types,
+  // migrate old shapes forward, and pass through anything we don't recognize
+  // (an unknown entity id, or an ingredient id no longer in a recipe) rather
+  // than dropping it — a future id rename or recipe edit should never cost a
+  // player their saved data.
+  function normalizeState(parsed) {
+    const overrides =
+      parsed && typeof parsed.overrides === "object" && parsed.overrides
+        ? parsed.overrides
+        : {};
+
+    const clean = {};
+    for (const [id, ov] of Object.entries(overrides)) {
+      if (!ov || typeof ov !== "object") continue;
+      const entry = {};
+      for (const k of STAT_KEYS) {
+        if (typeof ov[k] === "number" && isFinite(ov[k]) && ov[k] >= 0) {
+          entry[k] = ov[k];
+        }
+      }
+      if (typeof ov.unlocked === "boolean") entry.unlocked = ov.unlocked;
+      if (ov.ingredients && typeof ov.ingredients === "object") {
+        const cleanIng = {};
+        for (const [sid, amt] of Object.entries(ov.ingredients)) {
+          if (typeof amt === "number" && Number.isInteger(amt) && amt >= 1) {
+            cleanIng[sid] = amt;
+          }
+        }
+        if (Object.keys(cleanIng).length) entry.ingredients = cleanIng;
+      }
+      // v1 -> v2: stars/baseSellPrice/marketBoost were replaced by a single
+      // directly-editable sellPrice and are dropped rather than migrated —
+      // there's no sound way to derive one from the others post hoc.
+      if (Object.keys(entry).length) clean[id] = entry;
+    }
+
+    return {
+      version: STORAGE_VERSION,
+      overrides: clean,
+      controls: Object.assign(defaultControls(), (parsed && parsed.controls) || {}),
+    };
+  }
+
   function loadState() {
-    const fallback = { overrides: {}, controls: defaultControls() };
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return fallback;
-      const parsed = JSON.parse(raw);
-      const overrides =
-        parsed && typeof parsed.overrides === "object" && parsed.overrides
-          ? parsed.overrides
-          : {};
-      // keep only known ids / keys
-      const clean = {};
-      for (const [id, ov] of Object.entries(overrides)) {
-        if (!DEFAULT_BY_ID[id] || !ov || typeof ov !== "object") continue;
-        const entry = {};
-        for (const k of STAT_KEYS) {
-          if (typeof ov[k] === "number" && isFinite(ov[k]) && ov[k] >= 0) {
-            entry[k] = ov[k];
-          }
-        }
-        if (typeof ov.unlocked === "boolean") entry.unlocked = ov.unlocked;
-        if (ov.ingredients && typeof ov.ingredients === "object") {
-          const defAmounts = {};
-          for (const ing of DEFAULT_BY_ID[id].ingredients) {
-            defAmounts[ing.sellableId] = ing.amount;
-          }
-          const cleanIng = {};
-          for (const [sid, amt] of Object.entries(ov.ingredients)) {
-            if (
-              sid in defAmounts &&
-              typeof amt === "number" &&
-              Number.isInteger(amt) &&
-              amt >= 1
-            ) {
-              cleanIng[sid] = amt;
-            }
-          }
-          if (Object.keys(cleanIng).length) entry.ingredients = cleanIng;
-        }
-        if (Object.keys(entry).length) clean[id] = entry;
-      }
-      return {
-        overrides: clean,
-        controls: Object.assign(defaultControls(), parsed.controls || {}),
-      };
+      if (!raw) return normalizeState(null);
+      return normalizeState(JSON.parse(raw));
     } catch (e) {
-      return fallback;
+      return normalizeState(null);
     }
   }
 
@@ -153,36 +169,21 @@
   }
 
   // ---- overrides mutation ------------------------------------------------
+  // These always record what the player actually entered, even when it
+  // matches the current default — a value equal to today's default is not
+  // necessarily equal to tomorrow's, and only a value the player never
+  // touched should follow data.js when it changes.
   function setStat(id, key, value) {
     const ov = (state.overrides[id] = state.overrides[id] || {});
-    if (value === DEFAULT_BY_ID[id][key]) {
-      delete ov[key];
-    } else {
-      ov[key] = value;
-    }
-    pruneOverride(id);
+    ov[key] = value;
     saveState();
   }
 
   function setIngredientAmount(id, sellableId, value) {
-    const defAmount = DEFAULT_BY_ID[id].ingredients.find(
-      (i) => i.sellableId === sellableId
-    ).amount;
     const ov = (state.overrides[id] = state.overrides[id] || {});
     const ing = (ov.ingredients = ov.ingredients || {});
-    if (value === defAmount) {
-      delete ing[sellableId];
-    } else {
-      ing[sellableId] = value;
-    }
-    if (Object.keys(ing).length === 0) delete ov.ingredients;
-    pruneOverride(id);
+    ing[sellableId] = value;
     saveState();
-  }
-
-  function pruneOverride(id) {
-    const ov = state.overrides[id];
-    if (ov && Object.keys(ov).length === 0) delete state.overrides[id];
   }
 
   function setUnlocked(id, value) {
@@ -203,16 +204,8 @@
   }
 
   function markUnlock(id, value) {
-    if (value === DEFAULT_BY_ID[id].unlockedByDefault) {
-      const ov = state.overrides[id];
-      if (ov) {
-        delete ov.unlocked;
-        pruneOverride(id);
-      }
-    } else {
-      const ov = (state.overrides[id] = state.overrides[id] || {});
-      ov.unlocked = value;
-    }
+    const ov = (state.overrides[id] = state.overrides[id] || {});
+    ov.unlocked = value;
   }
 
   function walk(startId, visit) {
@@ -568,6 +561,83 @@
       resetAll();
       renderAll();
     });
+
+    document.getElementById("export-data").addEventListener("click", exportData);
+
+    const importInput = document.getElementById("import-file");
+    document.getElementById("import-data").addEventListener("click", () => {
+      importInput.value = ""; // allow re-importing the same file twice in a row
+      importInput.click();
+    });
+    importInput.addEventListener("change", () => {
+      const file = importInput.files[0];
+      if (file) importData(file);
+    });
+  }
+
+  const importStatus = () => document.getElementById("import-status");
+
+  // Hand the player a copy of everything they've entered — the only backup
+  // that exists, since a code change or a browser evicting localStorage
+  // (Safari/iOS, cleared site data, a new device) can't be undone otherwise.
+  function exportData() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ipm-explorer-backup-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(file) {
+    const status = importStatus();
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try {
+        parsed = JSON.parse(reader.result);
+      } catch (e) {
+        status.textContent = "That file isn't valid JSON — nothing was imported.";
+        return;
+      }
+      if (
+        !confirm(
+          "Import this file? It will replace all your current stats and unlocks."
+        )
+      ) {
+        return;
+      }
+      const next = normalizeState(parsed);
+      state.overrides = next.overrides;
+      state.controls = next.controls;
+      saveState();
+      syncControlsUI();
+      renderAll();
+      status.textContent = "Import complete.";
+    };
+    reader.onerror = () => {
+      status.textContent = "Couldn't read that file — nothing was imported.";
+    };
+    reader.readAsText(file);
+  }
+
+  // Re-sync the chart-control widgets with state.controls after a bulk
+  // replacement (import) rather than a single field's change.
+  function syncControlsUI() {
+    document.getElementById("sort-control").value = state.controls.sort;
+    for (const [containerId, key] of [
+      ["scale-control", "scale"],
+      ["category-control", "category"],
+    ]) {
+      const container = document.getElementById(containerId);
+      for (const b of container.querySelectorAll("button")) {
+        b.classList.toggle("active", b.dataset.value === state.controls[key]);
+      }
+    }
   }
 
   function segmented(containerId, controlKey) {

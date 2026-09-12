@@ -83,3 +83,28 @@ When extending this model (e.g. toward the web app in `PRD.md`), preserve
 this recursive-ingredient-graph structure — profit calculations for any
 alloy/item are only correct if they walk the full dependency chain down to
 raw ore costs, not just their direct ingredients.
+
+## Persistence (web app)
+
+Player edits are the whole value of this tool — entering sell prices for
+every ore/alloy/item is tedious, so losing them is treated as a critical
+bug, not a cosmetic one. `app.js` stores them in `localStorage` under
+`STORAGE_KEY` (`"ipm-explorer-v1"`) as `{ version, overrides, controls }`,
+where `overrides` is sparse: it holds only fields a player actually touched,
+keyed by entity id, and unrecognized ids/fields are kept rather than
+dropped so a future rename can't silently discard someone's edits.
+
+- **Never change `STORAGE_KEY`.** That would orphan every existing save
+  under the old key with no migration path.
+- **Never let `loadState`/`normalizeState` silently drop a field.** Two past
+  deploys did this by accident (a whitelist of known stat keys quietly
+  shrank), which is exactly the "my edits were forgotten" failure mode.
+  Removing or renaming a stat key requires bumping `STORAGE_VERSION` and
+  adding an explicit migration step in `normalizeState` instead.
+- **An override should be written whenever the player touches a field, even
+  if the value matches the current default.** Otherwise a later change to
+  that default in `data.js` silently rewrites what looks like "their" value.
+- The "Export my data" / "Import data" buttons are the only backup —
+  `localStorage` can also be lost outside of any deploy (Safari/iOS
+  eviction, cleared site data, a new device/browser), which the versioned
+  schema above can't help with.

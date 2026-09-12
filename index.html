@@ -51,9 +51,19 @@
         </div>
       </div>
 
-      <button type="button" id="reset-all" class="btn-secondary">
-        Reset all to defaults
-      </button>
+      <div class="controls-actions">
+        <button type="button" id="reset-all" class="btn-secondary">
+          Reset all to defaults
+        </button>
+        <button type="button" id="export-data" class="btn-secondary">
+          Export my data
+        </button>
+        <button type="button" id="import-data" class="btn-secondary">
+          Import data
+        </button>
+        <input type="file" id="import-file" accept="application/json" hidden />
+        <span id="import-status" class="import-status" aria-live="polite"></span>
+      </div>
     </section>
 
     <section class="card chart-card" aria-label="Profit per second chart">
