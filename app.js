@@ -551,6 +551,10 @@
     const td = cell(tr);
     td.className = "col-price";
 
+    const prefix = document.createElement("span");
+    prefix.className = "price-prefix";
+    prefix.textContent = "$";
+
     const numInput = document.createElement("input");
     numInput.type = "number";
     numInput.step = "any";
@@ -591,6 +595,7 @@
       focusNextSellPriceInput(numInput);
     });
 
+    td.appendChild(prefix);
     td.appendChild(numInput);
     td.appendChild(select);
   }
