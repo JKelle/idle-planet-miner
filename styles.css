@@ -314,6 +314,13 @@ select {
   font-weight: 600;
 }
 
+.entity-icon {
+  height: 1.1em;
+  width: 1.1em;
+  object-fit: contain;
+  vertical-align: -0.2em;
+}
+
 .col-ingredients .ing-row {
   display: flex;
   align-items: center;

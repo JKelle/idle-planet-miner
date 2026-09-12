@@ -378,7 +378,8 @@
 
       const tdName = cell(tr);
       tdName.className = "col-name";
-      tdName.textContent = base.name;
+      tdName.appendChild(entityIcon(base.id));
+      tdName.appendChild(document.createTextNode(" " + base.name));
 
       if (isOre) {
         cell(tr); // time — not applicable to ores
@@ -400,6 +401,14 @@
     const td = document.createElement("td");
     tr.appendChild(td);
     return td;
+  }
+
+  function entityIcon(id) {
+    const img = document.createElement("img");
+    img.className = "entity-icon";
+    img.src = "assets/icons/" + id + ".webp";
+    img.alt = "";
+    return img;
   }
 
   function statInput(tr, entity, id, key, opts) {
@@ -514,7 +523,8 @@
 
       const name = document.createElement("span");
       name.className = "ing-name";
-      name.textContent = child.name;
+      name.appendChild(entityIcon(child.id));
+      name.appendChild(document.createTextNode(" " + child.name));
 
       const x = document.createElement("span");
       x.className = "ing-x";
