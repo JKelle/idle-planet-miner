@@ -23,6 +23,16 @@
   </header>
 
   <main>
+    <section class="card boosts-card" aria-label="Market boosts">
+      <h2>Market boosts</h2>
+      <p class="card-sub">Temporary in-game price multipliers.</p>
+      <div id="boost-list"></div>
+      <div class="boost-add">
+        <label for="boost-add-select">Add boost</label>
+        <select id="boost-add-select"></select>
+      </div>
+    </section>
+
     <section class="card controls-card" aria-label="Chart controls">
       <div class="control-group" role="group" aria-label="Axis scale">
         <span class="control-label">Axis scale</span>
@@ -83,7 +93,6 @@
             <tr>
               <th scope="col">On</th>
               <th scope="col" class="col-name">Ore</th>
-              <th scope="col">Boost ×</th>
               <th></th>
               <th></th>
               <th scope="col">Sell price</th>
@@ -100,7 +109,6 @@
             <tr>
               <th scope="col">On</th>
               <th scope="col" class="col-name">Alloy</th>
-              <th scope="col">Boost ×</th>
               <th scope="col">Smelt time</th>
               <th scope="col" class="col-ingredients">Ingredients</th>
               <th scope="col">Sell price</th>
@@ -117,7 +125,6 @@
             <tr>
               <th scope="col">On</th>
               <th scope="col" class="col-name">Item</th>
-              <th scope="col">Boost ×</th>
               <th scope="col">Craft time</th>
               <th scope="col" class="col-ingredients">Ingredients</th>
               <th scope="col">Sell price</th>

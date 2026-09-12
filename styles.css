@@ -84,6 +84,74 @@ main {
   font-size: 0.85rem;
 }
 
+/* ---- market boosts ---- */
+.boost-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.boost-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.boost-input {
+  font: inherit;
+  width: 68px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: right;
+}
+
+.boost-input.invalid {
+  border-color: var(--danger);
+  background: #fdf3f2;
+}
+
+.boost-remove {
+  border: 0;
+  background: none;
+  color: var(--text-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.boost-remove:hover {
+  color: var(--danger);
+}
+
+.boost-empty {
+  margin: 0 0 8px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.boost-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.boost-add label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.boost-add select {
+  flex: 1;
+  max-width: 260px;
+}
+
 /* ---- controls ---- */
 .controls-card {
   display: flex;
@@ -205,7 +273,7 @@ select {
 
 .stat-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 670px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
@@ -223,21 +291,16 @@ select {
 
 .stat-table th:nth-child(3),
 .stat-table td:nth-child(3) {
-  width: 90px;
+  width: 100px;
 }
 
 .stat-table th:nth-child(4),
 .stat-table td:nth-child(4) {
-  width: 100px;
+  width: 216px;
 }
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 216px;
-}
-
-.stat-table th:nth-child(6),
-.stat-table td:nth-child(6) {
   width: 120px;
 }
 
@@ -273,7 +336,7 @@ select {
 }
 
 /* Sell price is the main field to tune and its values run large. */
-.stat-table td:nth-child(6) input {
+.stat-table td:nth-child(5) input {
   width: 100px;
 }
 

@@ -345,6 +345,113 @@
       `<span><i style="background:${getVar("--accent-item")}"></i>Item</span>`;
   }
 
+  // ---- market boosts --------------------------------------------------
+  const CATEGORY_LABELS = { ore: "Ores", alloy: "Alloys", item: "Items" };
+
+  function renderBoosts() {
+    const byId = resolvedMap();
+    const list = document.getElementById("boost-list");
+    list.innerHTML = "";
+
+    const boosted = DEFAULT_ENTITIES.filter((e) => byId[e.id].marketBoost !== 1);
+    if (boosted.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "boost-empty";
+      empty.textContent = "No active boosts.";
+      list.appendChild(empty);
+    }
+
+    for (const base of boosted) {
+      const e = byId[base.id];
+      const row = document.createElement("div");
+      row.className = "boost-row";
+
+      const name = document.createElement("span");
+      name.className = "boost-name";
+      name.textContent = base.name;
+
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.step = "any";
+      input.value = String(e.marketBoost);
+      input.className = "boost-input";
+      input.dataset.entityId = base.id;
+      input.setAttribute("aria-label", `${base.name} market boost`);
+      input.addEventListener("input", () => {
+        const raw = input.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && n > 0;
+        input.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        setStat(base.id, "marketBoost", n);
+        renderChart();
+      });
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "boost-remove";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", `Remove ${base.name} boost`);
+      remove.addEventListener("click", () => {
+        setStat(base.id, "marketBoost", 1);
+        renderBoosts();
+        renderChart();
+      });
+
+      row.appendChild(name);
+      row.appendChild(input);
+      row.appendChild(remove);
+      list.appendChild(row);
+    }
+
+    renderBoostAddSelect(byId, boosted);
+  }
+
+  function renderBoostAddSelect(byId, boosted) {
+    const select = document.getElementById("boost-add-select");
+    select.innerHTML = "";
+    const boostedIds = new Set(boosted.map((e) => e.id));
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Choose entity…";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+
+    for (const category of ["ore", "alloy", "item"]) {
+      const candidates = DEFAULT_ENTITIES.filter(
+        (e) => e.category === category && isUnlocked(e.id) && !boostedIds.has(e.id)
+      );
+      if (candidates.length === 0) continue;
+      const group = document.createElement("optgroup");
+      group.label = CATEGORY_LABELS[category];
+      for (const e of candidates) {
+        const option = document.createElement("option");
+        option.value = e.id;
+        option.textContent = e.name;
+        group.appendChild(option);
+      }
+      select.appendChild(group);
+    }
+
+    select.onchange = () => {
+      const id = select.value;
+      if (!id) return;
+      setStat(id, "marketBoost", 2);
+      renderBoosts();
+      renderChart();
+      const added = document.querySelector(
+        `#boost-list input[data-entity-id="${id}"]`
+      );
+      if (added) {
+        added.focus();
+        added.select();
+      }
+    };
+  }
+
   // ---- stat tables --------------------------------------------------
   function renderStatTables() {
     renderStatTable("ore-tbody", "ore");
@@ -377,8 +484,6 @@
       const tdName = cell(tr);
       tdName.className = "col-name";
       tdName.textContent = base.name;
-
-      statInput(tr, e, base.id, "marketBoost", { exclusiveMin: true });
 
       if (isOre) {
         cell(tr); // time — not applicable to ores
@@ -510,6 +615,7 @@
   // ---- top-level render ------------------------------------------
   function renderAll() {
     renderChart();
+    renderBoosts();
     renderStatTables();
   }
 
