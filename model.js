@@ -61,7 +61,7 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Port of format_money_per_sec in profit.py: 3 sig figs, K/M/B/T suffix.
+// Port of format_money_per_sec in profit.py: 4 sig figs, K/M/B/T suffix.
 // Above 1e15 (only reachable with late locked tiers) falls back to exponent
 // form rather than inventing suffix names.
 function formatMoneyPerSec(value) {
@@ -72,7 +72,7 @@ function formatMoney(value) {
   return (value < 0 ? "-" : "") + "$" + formatCompact(Math.abs(value));
 }
 
-// Number → shortest readable string: 3 sig figs plus the highest K/M/B/T suffix
+// Number → shortest readable string: 4 sig figs plus the highest K/M/B/T suffix
 // that keeps the shown value >= 1 (so 3.2M, never 3200K or 0.003B). Also parses
 // back via parseCompact. Above 1e15 (late locked tiers only) falls back to
 // exponent form rather than inventing suffix names.
@@ -88,11 +88,11 @@ function formatCompact(value) {
   ];
   for (const [threshold, suffix] of tiers) {
     if (abs >= threshold && abs < 1e15) {
-      return `${sign}${sig3(abs / threshold)}${suffix}`;
+      return `${sign}${sig4(abs / threshold)}${suffix}`;
     }
   }
-  if (abs >= 1e15) return `${sign}${abs.toExponential(2)}`;
-  return `${sign}${sig3(abs)}`;
+  if (abs >= 1e15) return `${sign}${abs.toExponential(3)}`;
+  return `${sign}${sig4(abs)}`;
 }
 
 // Inverse of formatCompact: "3.05M" / "3050k" / "3050000" -> 3050000. Returns
@@ -104,10 +104,10 @@ function parseCompact(str) {
   return parseFloat(m[1]) * mult;
 }
 
-// Mimic Python's "%.3g": up to 3 significant digits, no trailing zeros.
-function sig3(n) {
+// Mimic Python's "%.4g": up to 4 significant digits, no trailing zeros.
+function sig4(n) {
   if (n === 0) return "0";
-  return Number(n.toPrecision(3)).toString();
+  return Number(n.toPrecision(4)).toString();
 }
 
 function formatDuration(seconds) {
