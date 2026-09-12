@@ -61,9 +61,9 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Port of format_money_per_sec in profit.py: 4 sig figs, K/M/B/T suffix.
-// Above 1e15 (only reachable with late locked tiers) falls back to exponent
-// form rather than inventing suffix names.
+// Port of format_money_per_sec in profit.py: 4 sig figs, game-suffix scaling.
+// Above the top suffix (only reachable with late locked tiers) falls back to
+// exponent form rather than inventing suffix names.
 function formatMoneyPerSec(value) {
   return formatMoney(value) + "/s";
 }
@@ -72,36 +72,51 @@ function formatMoney(value) {
   return (value < 0 ? "-" : "") + "$" + formatCompact(Math.abs(value));
 }
 
-// Number → shortest readable string: 4 sig figs plus the highest K/M/B/T suffix
-// that keeps the shown value >= 1 (so 3.2M, never 3200K or 0.003B). Also parses
-// back via parseCompact. Above 1e15 (late locked tiers only) falls back to
-// exponent form rather than inventing suffix names.
+// Suffix ladder as shown in-game, largest first. Case matters: q/Q and s/S are
+// distinct tiers, not typos.
+const SUFFIX_TIERS = [
+  [1e30, "N"],
+  [1e27, "O"],
+  [1e24, "S"],
+  [1e21, "s"],
+  [1e18, "Q"],
+  [1e15, "q"],
+  [1e12, "T"],
+  [1e9, "B"],
+  [1e6, "M"],
+  [1e3, "K"],
+];
+
+// Number → shortest readable string: 4 sig figs plus the highest suffix that
+// keeps the shown value >= 1 (so 3.2M, never 3200K or 0.003B). Above the N
+// tier (1e33, past every entity currently in data.js) falls back to exponent
+// form rather than inventing suffix names.
 function formatCompact(value) {
   const sign = value < 0 ? "-" : "";
   const abs = Math.abs(value);
   if (!isFinite(abs)) return sign + "∞";
-  const tiers = [
-    [1e12, "T"],
-    [1e9, "B"],
-    [1e6, "M"],
-    [1e3, "K"],
-  ];
-  for (const [threshold, suffix] of tiers) {
-    if (abs >= threshold && abs < 1e15) {
+  for (const [threshold, suffix] of SUFFIX_TIERS) {
+    if (abs >= threshold && abs < 1e33) {
       return `${sign}${sig4(abs / threshold)}${suffix}`;
     }
   }
-  if (abs >= 1e15) return `${sign}${abs.toExponential(3)}`;
+  if (abs >= 1e33) return `${sign}${abs.toExponential(3)}`;
   return `${sign}${sig4(abs)}`;
 }
 
-// Inverse of formatCompact: "3.05M" / "3050k" / "3050000" -> 3050000. Returns
-// NaN for anything else (empty, letters, trailing junk, scientific notation).
-function parseCompact(str) {
-  const m = /^\s*(-?\d*\.?\d+)\s*([kmbt]?)\s*$/i.exec(str);
-  if (!m) return NaN;
-  const mult = { k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2].toLowerCase()] || 1;
-  return parseFloat(m[1]) * mult;
+// Split a value into an editable (mantissa, suffix) pair for the sell-price
+// number + dropdown controls — the inverse of formatCompact, but returning
+// parts instead of a string. Values past the N tier still get a (huge)
+// mantissa under "N" rather than becoming unrepresentable in the controls.
+function splitCompact(value) {
+  const sign = value < 0 ? -1 : 1;
+  const abs = Math.abs(value);
+  for (const [threshold, suffix] of SUFFIX_TIERS) {
+    if (abs >= threshold) {
+      return { mantissa: sign * Number(sig4(abs / threshold)), suffix };
+    }
+  }
+  return { mantissa: sign * Number(sig4(abs)), suffix: "" };
 }
 
 // Mimic Python's "%.4g": up to 4 significant digits, no trailing zeros.
@@ -166,7 +181,8 @@ if (typeof module !== "undefined" && module.exports) {
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
-    parseCompact,
+    splitCompact,
+    SUFFIX_TIERS,
     formatDuration,
     formatDurationCompact,
     parseDuration,

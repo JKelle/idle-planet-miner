@@ -273,7 +273,7 @@ select {
 
 .stat-table {
   width: 100%;
-  min-width: 670px;
+  min-width: 720px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
@@ -301,7 +301,7 @@ select {
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 120px;
+  width: 170px;
 }
 
 .stat-table th,
@@ -335,9 +335,21 @@ select {
   text-align: right;
 }
 
-/* Sell price is the main field to tune and its values run large. */
-.stat-table td:nth-child(5) input {
-  width: 100px;
+/* Sell price is edited as a number + suffix dropdown, side by side. */
+.stat-table td.col-price {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.price-num {
+  width: 90px;
+}
+
+.price-suffix {
+  width: 54px;
+  padding: 4px 2px;
 }
 
 .stat-table input.invalid {

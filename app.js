@@ -23,11 +23,21 @@
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
-    parseCompact,
+    splitCompact,
+    SUFFIX_TIERS,
     formatDuration,
     formatDurationCompact,
     parseDuration,
   };
+
+  // Sell-price suffix dropdown, low to high, plus a "—" entry for the bare
+  // (×1) tier. SUFFIX_TIERS itself is ordered high to low (largest-first,
+  // for formatCompact's lookup), so build this the other way round.
+  const SUFFIX_OPTIONS = [{ value: "", mult: 1 }].concat(
+    SUFFIX_TIERS.slice()
+      .reverse()
+      .map(([mult, value]) => ({ value, mult }))
+  );
 
   const DEFAULT_BY_ID = {};
   for (const e of DEFAULT_ENTITIES) DEFAULT_BY_ID[e.id] = e;
@@ -496,10 +506,7 @@
         renderIngredientCell(tr, e, base.id);
       }
 
-      statInput(tr, e, base.id, "sellPrice", {
-        format: F().formatCompact,
-        parse: F().parseCompact,
-      });
+      renderSellPriceCell(tr, e, base.id);
       tbody.appendChild(tr);
     }
   }
@@ -527,16 +534,79 @@
     input.addEventListener("input", () => {
       const raw = input.value.trim();
       const n = opts.parse ? opts.parse(raw) : Number(raw);
-      let ok = raw !== "" && isFinite(n) && !Number.isNaN(n);
+      let ok = raw !== "" && isFinite(n) && !Number.isNaN(n) && n >= 0;
       if (ok && opts.integer && !Number.isInteger(n)) ok = false;
-      if (ok && opts.exclusiveMin && n <= 0) ok = false;
-      if (ok && !opts.exclusiveMin && n < 0) ok = false;
       input.classList.toggle("invalid", !ok);
       if (!ok) return;
       setStat(id, key, n);
       renderChart();
     });
     td.appendChild(input);
+  }
+
+  // Sell price is edited as a plain number plus a K/M/B/... suffix dropdown
+  // (instead of one free-text field) so the player can type digits and hit
+  // Enter without reaching for a suffix letter.
+  function renderSellPriceCell(tr, entity, id) {
+    const td = cell(tr);
+    td.className = "col-price";
+
+    const numInput = document.createElement("input");
+    numInput.type = "number";
+    numInput.step = "any";
+    numInput.min = "0";
+    numInput.className = "price-num";
+    numInput.setAttribute("aria-label", `${entity.name} sellPrice`);
+
+    const select = document.createElement("select");
+    select.className = "price-suffix";
+    for (const opt of SUFFIX_OPTIONS) {
+      const option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.value || "—";
+      select.appendChild(option);
+    }
+    select.setAttribute("aria-label", `${entity.name} sell price suffix`);
+
+    const { mantissa, suffix } = F().splitCompact(entity.sellPrice);
+    numInput.value = String(mantissa);
+    select.value = suffix;
+
+    function commit() {
+      const raw = numInput.value.trim();
+      const n = Number(raw);
+      const ok = raw !== "" && isFinite(n) && n >= 0;
+      numInput.classList.toggle("invalid", !ok);
+      if (!ok) return;
+      const mult = SUFFIX_OPTIONS.find((o) => o.value === select.value).mult;
+      setStat(id, "sellPrice", n * mult);
+      renderChart();
+    }
+
+    numInput.addEventListener("input", commit);
+    select.addEventListener("change", commit);
+    numInput.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      focusNextSellPriceInput(numInput);
+    });
+
+    td.appendChild(numInput);
+    td.appendChild(select);
+  }
+
+  // Move focus to the next unlocked row's sell-price field, wrapping around.
+  // If `current` isn't itself in that list (e.g. its row just got locked),
+  // jump to the first one instead.
+  function focusNextSellPriceInput(current) {
+    const inputs = Array.from(
+      document.querySelectorAll(".stat-table tr:not(.locked) .price-num")
+    );
+    if (inputs.length === 0) return;
+    const idx = inputs.indexOf(current);
+    const next = inputs[idx === -1 ? 0 : (idx + 1) % inputs.length];
+    next.focus();
+    next.select();
   }
 
   function renderIngredientCell(tr, entity, id) {
