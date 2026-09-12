@@ -13,10 +13,9 @@ function get(byId, id) {
   return e;
 }
 
-// `entity.sellPrice` is the price the player enters directly; `marketBoost` is a
-// separate multiplier for temporary in-game market events (default 1.0).
+// `entity.sellPrice` is the price the player enters directly.
 function sellPrice(entity) {
-  return entity.sellPrice * entity.marketBoost;
+  return entity.sellPrice;
 }
 
 // Recursive raw-ore cost of an entity's ingredients. Non-ore ingredients

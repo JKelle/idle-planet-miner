@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Idle Planet Miner — Profitability Explorer</title>
-  <meta name="description" content="Plug in your own Idle Planet Miner save — star levels, prices, market boosts — and see which alloy or item is most profitable to smelt or craft per second." />
+  <meta name="description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
-  <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices, market boosts — and see which alloy or item is most profitable to smelt or craft per second." />
+  <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -17,22 +17,12 @@
     <p class="tagline">
       Edit your in-game stats and see which alloy or item is most profitable to
       smelt or craft, per second. The numbers below are one player's save —
-      edit the sell prices, boosts, and unlock toggles in the Stats section to
+      edit the sell prices and unlock toggles in the Stats section to
       match your own game.
     </p>
   </header>
 
   <main>
-    <section class="card boosts-card" aria-label="Market boosts">
-      <h2>Market boosts</h2>
-      <p class="card-sub">Temporary in-game price multipliers.</p>
-      <div id="boost-list"></div>
-      <div class="boost-add">
-        <label for="boost-add-select">Add boost</label>
-        <select id="boost-add-select"></select>
-      </div>
-    </section>
-
     <section class="card controls-card" aria-label="Chart controls">
       <div class="control-group" role="group" aria-label="Axis scale">
         <span class="control-label">Axis scale</span>
@@ -79,7 +69,7 @@
     <section class="card stats-card" aria-label="Stats">
       <h2>Stats</h2>
       <p class="card-sub">
-        Edit sell price, market boost, time, and ingredient amounts inline. Ores
+        Edit sell price, time, and ingredient amounts inline. Ores
         have no craft time or ingredients and never appear in the chart. Tick
         entities on as you unlock them in-game — turning one on also turns on
         everything it needs; turning one off also turns off anything that needs

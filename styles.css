@@ -84,74 +84,6 @@ main {
   font-size: 0.85rem;
 }
 
-/* ---- market boosts ---- */
-.boost-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.boost-name {
-  flex: 1;
-  font-weight: 600;
-}
-
-.boost-input {
-  font: inherit;
-  width: 68px;
-  padding: 4px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  text-align: right;
-}
-
-.boost-input.invalid {
-  border-color: var(--danger);
-  background: #fdf3f2;
-}
-
-.boost-remove {
-  border: 0;
-  background: none;
-  color: var(--text-soft);
-  font-size: 1.1rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.boost-remove:hover {
-  color: var(--danger);
-}
-
-.boost-empty {
-  margin: 0 0 8px;
-  color: var(--text-soft);
-  font-size: 0.85rem;
-}
-
-.boost-add {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.boost-add label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.boost-add select {
-  flex: 1;
-  max-width: 260px;
-}
-
 /* ---- controls ---- */
 .controls-card {
   display: flex;
@@ -335,11 +267,12 @@ select {
   text-align: right;
 }
 
-/* Sell price is edited as a number + suffix dropdown, side by side. */
-.stat-table td.col-price {
-  display: flex;
+/* Sell price is edited as a number + suffix dropdown, side by side. Flexed on
+ * an inner wrapper, not the <td> itself — display:flex on a table cell would
+ * opt it out of the table's column-width sharing with its header cell. */
+.price-wrap {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 4px;
 }
 
