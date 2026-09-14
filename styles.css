@@ -172,6 +172,21 @@ select {
   color: var(--text-soft);
 }
 
+/* ---- researched tech toggles ---- */
+.techs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+.tech-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 /* ---- chart ---- */
 .chart-legend {
   display: flex;
@@ -217,7 +232,10 @@ select {
 
 .stat-table {
   width: 100%;
-  min-width: 740px;
+  /* Widened for the time/ingredients/sell-price columns below, which need
+   * room for a raw field plus a linked "effective" field when a researched
+   * tech changes an alloy's numbers (see .eff-arrow/.eff-input). */
+  min-width: 1100px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
@@ -235,17 +253,17 @@ select {
 
 .stat-table th:nth-child(3),
 .stat-table td:nth-child(3) {
-  width: 100px;
+  width: 190px;
 }
 
 .stat-table th:nth-child(4),
 .stat-table td:nth-child(4) {
-  width: 216px;
+  width: 320px;
 }
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 190px;
+  width: 360px;
 }
 
 .stat-table th,
@@ -286,6 +304,22 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Wraps a raw stat field and, when a researched tech applies, its linked
+ * "effective" field — same reasoning as .price-wrap above. */
+.stat-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.eff-arrow {
+  color: var(--text-soft);
+}
+
+.eff-input {
+  color: var(--text-soft);
 }
 
 .price-prefix {

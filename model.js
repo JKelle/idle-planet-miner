@@ -60,6 +60,19 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
+// Research-project multipliers, expressed so that effective = base * mult.
+// All five projects affect smelters (alloys) only; items change only through
+// their alloy ingredients, which the recipe recursion already handles.
+function techMultipliers(techs) {
+  const on = (k) => (techs && techs[k] ? 1 : 0);
+  const speed = Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace"));
+  return {
+    sellPrice: Math.pow(1.2, on("techAdvancedAlloyValue") + on("techSuperiorAlloyValue")),
+    smeltTimeSeconds: 1 / speed,
+    ingredient: on("techSmeltingEfficiency") ? 0.8 : 1,
+  };
+}
+
 // Port of format_money_per_sec in profit.py: 4 sig figs, game-suffix scaling.
 // Above the top suffix (only reachable with late locked tiers) falls back to
 // exponent form rather than inventing suffix names.
@@ -177,6 +190,7 @@ if (typeof module !== "undefined" && module.exports) {
     totalTimeToCreate,
     profitPerSecond,
     newMemos,
+    techMultipliers,
     formatMoney,
     formatMoneyPerSec,
     formatCompact,

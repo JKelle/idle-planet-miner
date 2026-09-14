@@ -28,6 +28,7 @@
     totalTimeToCreate,
     profitPerSecond,
     newMemos,
+    techMultipliers,
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
@@ -69,7 +70,18 @@
   let currentRows = []; // [{ entity, value }] in chart order
 
   function defaultControls() {
-    return { scale: "linear", sort: "profit-desc", category: "all" };
+    return {
+      scale: "linear",
+      sort: "profit-desc",
+      category: "all",
+      // Flat (not nested) so normalizeState's Object.assign merge gives every
+      // old save `false` for these with no migration needed.
+      techAdvancedFurnace: false,
+      techSmeltingEfficiency: false,
+      techSuperiorFurnace: false,
+      techAdvancedAlloyValue: false,
+      techSuperiorAlloyValue: false,
+    };
   }
 
   // Normalize a parsed (or freshly-imported) state blob: validate types,
@@ -96,7 +108,7 @@
       if (ov.ingredients && typeof ov.ingredients === "object") {
         const cleanIng = {};
         for (const [sid, amt] of Object.entries(ov.ingredients)) {
-          if (typeof amt === "number" && Number.isInteger(amt) && amt >= 1) {
+          if (typeof amt === "number" && isFinite(amt) && amt > 0) {
             cleanIng[sid] = amt;
           }
         }
@@ -168,6 +180,31 @@
     return m;
   }
 
+  // Layers the researched-tech multipliers on top of resolved() — only alloys
+  // are affected (smelters make alloys; items change only indirectly, through
+  // the recipe recursion over their alloy ingredients).
+  function withTechs(entity, mults) {
+    if (entity.category !== "alloy") return entity;
+    return {
+      id: entity.id,
+      name: entity.name,
+      category: entity.category,
+      ingredients: entity.ingredients.map((i) => ({
+        sellableId: i.sellableId,
+        amount: i.amount * mults.ingredient,
+      })),
+      sellPrice: entity.sellPrice * mults.sellPrice,
+      smeltTimeSeconds: entity.smeltTimeSeconds * mults.smeltTimeSeconds,
+    };
+  }
+
+  function effectiveMap() {
+    const mults = F().techMultipliers(state.controls);
+    const m = {};
+    for (const e of DEFAULT_ENTITIES) m[e.id] = withTechs(resolved(e.id), mults);
+    return m;
+  }
+
   // ---- overrides mutation ------------------------------------------------
   // These always record what the player actually entered, even when it
   // matches the current default — a value equal to today's default is not
@@ -226,7 +263,7 @@
 
   // ---- computed rows ----------------------------------------------------
   function computeRows() {
-    const byId = resolvedMap();
+    const byId = effectiveMap();
     const memos = window.__model.newMemos();
     const rows = DEFAULT_ENTITIES.filter(
       (e) => e.category !== "ore" && isUnlocked(e.id)
@@ -356,6 +393,14 @@
 
   function renderStatTable(tbodyId, category) {
     const byId = resolvedMap();
+    // Researched-tech multipliers only apply to alloys (smelters); ores and
+    // items always get the identity multiplier so no "effective" field shows.
+    const mults = F().techMultipliers(state.controls);
+    const isAlloy = category === "alloy";
+    const timeMult = isAlloy ? mults.smeltTimeSeconds : 1;
+    const ingredientMult = isAlloy ? mults.ingredient : 1;
+    const sellPriceMult = isAlloy ? mults.sellPrice : 1;
+
     const tbody = document.getElementById(tbodyId);
     tbody.innerHTML = "";
     const isOre = category === "ore";
@@ -385,14 +430,18 @@
         cell(tr); // time — not applicable to ores
         cell(tr); // ingredients — not applicable to ores
       } else {
-        statInput(tr, e, base.id, "smeltTimeSeconds", {
-          format: F().formatDurationCompact,
-          parse: F().parseDuration,
-        });
-        renderIngredientCell(tr, e, base.id);
+        statInput(
+          tr,
+          e,
+          base.id,
+          "smeltTimeSeconds",
+          { format: F().formatDurationCompact, parse: F().parseDuration },
+          timeMult
+        );
+        renderIngredientCell(tr, e, base.id, ingredientMult);
       }
 
-      renderSellPriceCell(tr, e, base.id);
+      renderSellPriceCell(tr, e, base.id, sellPriceMult);
       tbody.appendChild(tr);
     }
   }
@@ -411,13 +460,23 @@
     return img;
   }
 
-  function statInput(tr, entity, id, key, opts) {
+  // `mult` is the researched-tech multiplier for this stat (1 = no effect).
+  // When it isn't 1, a second "effective" field is shown alongside the raw
+  // one the player edits — either can be typed into, and they stay linked.
+  function statInput(tr, entity, id, key, opts, mult) {
     const td = cell(tr);
+    const wrap = document.createElement("span");
+    wrap.className = "stat-wrap";
+
+    function fieldValue(v) {
+      return opts.format ? opts.format(v) : String(v);
+    }
+
     const input = document.createElement("input");
     if (opts.format) {
       // text field so it can hold e.g. "3.05M" or "1h 5m"; opts.parse inverts it
       input.type = "text";
-      input.value = opts.format(entity[key]);
+      input.value = fieldValue(entity[key]);
     } else {
       input.type = "number";
       input.min = "0";
@@ -425,6 +484,8 @@
       input.value = String(entity[key]);
     }
     input.setAttribute("aria-label", `${entity.name} ${key}`);
+
+    let effInput = null;
     input.addEventListener("input", () => {
       const raw = input.value.trim();
       const n = opts.parse ? opts.parse(raw) : Number(raw);
@@ -433,17 +494,51 @@
       input.classList.toggle("invalid", !ok);
       if (!ok) return;
       setStat(id, key, n);
+      if (effInput) effInput.value = fieldValue(n * mult);
       renderChart();
     });
-    td.appendChild(input);
+    wrap.appendChild(input);
+
+    if (mult !== 1) {
+      const arrow = document.createElement("span");
+      arrow.className = "eff-arrow";
+      arrow.textContent = "→";
+      wrap.appendChild(arrow);
+
+      effInput = document.createElement("input");
+      effInput.className = "eff-input";
+      if (opts.format) {
+        effInput.type = "text";
+      } else {
+        effInput.type = "number";
+        effInput.min = "0";
+        effInput.step = opts.integer ? "1" : "any";
+      }
+      effInput.value = fieldValue(entity[key] * mult);
+      effInput.setAttribute("aria-label", `${entity.name} ${key} (effective)`);
+      effInput.addEventListener("input", () => {
+        const raw = effInput.value.trim();
+        const n = opts.parse ? opts.parse(raw) : Number(raw);
+        let ok = raw !== "" && isFinite(n) && !Number.isNaN(n) && n >= 0;
+        if (ok && opts.integer && !Number.isInteger(n)) ok = false;
+        effInput.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        const base = n / mult;
+        setStat(id, key, base);
+        input.value = fieldValue(base);
+        renderChart();
+      });
+      wrap.appendChild(effInput);
+    }
+
+    td.appendChild(wrap);
   }
 
-  // Sell price is edited as a plain number plus a K/M/B/... suffix dropdown
-  // (instead of one free-text field) so the player can type digits and hit
-  // Enter without reaching for a suffix letter.
-  function renderSellPriceCell(tr, entity, id) {
-    const td = cell(tr);
-
+  // Builds one $ + number + K/M/B/... suffix-dropdown widget (instead of one
+  // free-text field) so the player can type digits and hit Enter without
+  // reaching for a suffix letter. Shared by the raw and effective sell-price
+  // fields — `onCommit` receives the fully-expanded value the player entered.
+  function buildPriceWidget(entity, ariaLabel, value, onCommit) {
     const prefix = document.createElement("span");
     prefix.className = "price-prefix";
     prefix.textContent = "$";
@@ -453,7 +548,7 @@
     numInput.step = "any";
     numInput.min = "0";
     numInput.className = "price-num";
-    numInput.setAttribute("aria-label", `${entity.name} sellPrice`);
+    numInput.setAttribute("aria-label", ariaLabel);
 
     const select = document.createElement("select");
     select.className = "price-suffix";
@@ -463,11 +558,14 @@
       option.textContent = opt.value || "—";
       select.appendChild(option);
     }
-    select.setAttribute("aria-label", `${entity.name} sell price suffix`);
+    select.setAttribute("aria-label", `${ariaLabel} suffix`);
 
-    const { mantissa, suffix } = F().splitCompact(entity.sellPrice);
-    numInput.value = String(mantissa);
-    select.value = suffix;
+    function setValue(v) {
+      const { mantissa, suffix } = F().splitCompact(v);
+      numInput.value = String(mantissa);
+      select.value = suffix;
+    }
+    setValue(value);
 
     function commit() {
       const raw = numInput.value.trim();
@@ -476,17 +574,11 @@
       numInput.classList.toggle("invalid", !ok);
       if (!ok) return;
       const mult = SUFFIX_OPTIONS.find((o) => o.value === select.value).mult;
-      setStat(id, "sellPrice", n * mult);
-      renderChart();
+      onCommit(n * mult);
     }
 
     numInput.addEventListener("input", commit);
     select.addEventListener("change", commit);
-    numInput.addEventListener("keydown", (ev) => {
-      if (ev.key !== "Enter") return;
-      ev.preventDefault();
-      focusNextSellPriceInput(numInput);
-    });
 
     // A <td> can't safely be display:flex — that would opt it out of the
     // table's column-width sharing with its header cell. Flex an inner
@@ -496,15 +588,68 @@
     wrap.appendChild(prefix);
     wrap.appendChild(numInput);
     wrap.appendChild(select);
-    td.appendChild(wrap);
+    return { wrap, numInput, setValue };
   }
 
-  // Move focus to the next unlocked row's sell-price field, wrapping around.
-  // If `current` isn't itself in that list (e.g. its row just got locked),
-  // jump to the first one instead.
+  // `mult` is the researched-tech sell-price multiplier (1 = no effect).
+  // When it isn't 1, a second "effective" widget is shown alongside the raw
+  // one the player edits — either can be typed into, and they stay linked.
+  function renderSellPriceCell(tr, entity, id, mult) {
+    const td = cell(tr);
+    const outer = document.createElement("span");
+    outer.className = "stat-wrap";
+
+    const raw = buildPriceWidget(
+      entity,
+      `${entity.name} sellPrice`,
+      entity.sellPrice,
+      (n) => {
+        setStat(id, "sellPrice", n);
+        if (eff) eff.setValue(n * mult);
+        renderChart();
+      }
+    );
+    raw.numInput.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      focusNextSellPriceInput(raw.numInput);
+    });
+    outer.appendChild(raw.wrap);
+
+    let eff = null;
+    if (mult !== 1) {
+      const arrow = document.createElement("span");
+      arrow.className = "eff-arrow";
+      arrow.textContent = "→";
+      outer.appendChild(arrow);
+
+      eff = buildPriceWidget(
+        entity,
+        `${entity.name} sellPrice (effective)`,
+        entity.sellPrice * mult,
+        (n) => {
+          const base = n / mult;
+          setStat(id, "sellPrice", base);
+          raw.setValue(base);
+          renderChart();
+        }
+      );
+      eff.wrap.classList.add("eff-input");
+      outer.appendChild(eff.wrap);
+    }
+
+    td.appendChild(outer);
+  }
+
+  // Move focus to the next unlocked row's raw sell-price field, wrapping
+  // around (skips the effective one, so Enter never jumps into it). If
+  // `current` isn't itself in that list (e.g. its row just got locked), jump
+  // to the first one instead.
   function focusNextSellPriceInput(current) {
     const inputs = Array.from(
-      document.querySelectorAll(".stat-table tr:not(.locked) .price-num")
+      document.querySelectorAll(
+        ".stat-table tr:not(.locked) .price-wrap:not(.eff-input) .price-num"
+      )
     );
     if (inputs.length === 0) return;
     const idx = inputs.indexOf(current);
@@ -513,7 +658,10 @@
     next.select();
   }
 
-  function renderIngredientCell(tr, entity, id) {
+  // `mult` is the researched-tech ingredient-cost multiplier (1 = no effect).
+  // When it isn't 1, a second "effective" field is shown alongside the raw
+  // one the player edits — either can be typed into, and they stay linked.
+  function renderIngredientCell(tr, entity, id, mult) {
     const td = cell(tr);
     td.className = "col-ingredients";
     for (const ing of entity.ingredients) {
@@ -532,26 +680,70 @@
 
       const input = document.createElement("input");
       input.type = "number";
-      input.min = "1";
-      input.step = "1";
+      input.min = "0";
+      input.step = "any";
       input.value = String(ing.amount);
       input.setAttribute("aria-label", `${entity.name} ${child.name} amount`);
+
+      let effInput = null;
       input.addEventListener("input", () => {
         const raw = input.value.trim();
         const n = Number(raw);
-        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 1;
+        const ok = raw !== "" && isFinite(n) && n > 0;
         input.classList.toggle("invalid", !ok);
         if (!ok) return;
         setIngredientAmount(id, ing.sellableId, n);
+        if (effInput) effInput.value = String(n * mult);
         renderChart();
       });
 
       row.appendChild(name);
       row.appendChild(x);
       row.appendChild(input);
+
+      if (mult !== 1) {
+        const arrow = document.createElement("span");
+        arrow.className = "eff-arrow";
+        arrow.textContent = "→";
+        row.appendChild(arrow);
+
+        effInput = document.createElement("input");
+        effInput.type = "number";
+        effInput.min = "0";
+        effInput.step = "any";
+        effInput.value = String(ing.amount * mult);
+        effInput.className = "eff-input";
+        effInput.setAttribute(
+          "aria-label",
+          `${entity.name} ${child.name} amount (effective)`
+        );
+        effInput.addEventListener("input", () => {
+          const raw = effInput.value.trim();
+          const n = Number(raw);
+          const ok = raw !== "" && isFinite(n) && n > 0;
+          effInput.classList.toggle("invalid", !ok);
+          if (!ok) return;
+          const base = n / mult;
+          setIngredientAmount(id, ing.sellableId, base);
+          input.value = String(base);
+          renderChart();
+        });
+        row.appendChild(effInput);
+      }
+
       td.appendChild(row);
     }
   }
+
+  // Checkbox id <-> controls key for each researched-tech toggle. Shared by
+  // initControls (wiring) and syncControlsUI (post-import resync).
+  const TECH_TOGGLES = [
+    ["tech-advanced-furnace", "techAdvancedFurnace"],
+    ["tech-smelting-efficiency", "techSmeltingEfficiency"],
+    ["tech-superior-furnace", "techSuperiorFurnace"],
+    ["tech-advanced-alloy-value", "techAdvancedAlloyValue"],
+    ["tech-superior-alloy-value", "techSuperiorAlloyValue"],
+  ];
 
   // ---- controls ----------------------------------------------------
   function initControls() {
@@ -565,6 +757,18 @@
       saveState();
       renderChart();
     });
+
+    for (const [checkboxId, key] of TECH_TOGGLES) {
+      const cb = document.getElementById(checkboxId);
+      cb.checked = state.controls[key];
+      cb.addEventListener("change", () => {
+        state.controls[key] = cb.checked;
+        saveState();
+        // Techs change the stat table's effective fields too, not just the
+        // chart, so this needs the full re-render (unlike the other controls).
+        renderAll();
+      });
+    }
 
     document.getElementById("reset-all").addEventListener("click", () => {
       if (!confirm("Reset every stat and unlock back to the game defaults?")) return;
@@ -647,6 +851,9 @@
       for (const b of container.querySelectorAll("button")) {
         b.classList.toggle("active", b.dataset.value === state.controls[key]);
       }
+    }
+    for (const [checkboxId, key] of TECH_TOGGLES) {
+      document.getElementById(checkboxId).checked = state.controls[key];
     }
   }
 
