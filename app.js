@@ -452,6 +452,10 @@
     return td;
   }
 
+  // `assets/icons/<id>.webp` is usually a data.js entity id, but the "Researched
+  // tech" checkboxes in index.html also have their own icons there (named by
+  // checkbox id, e.g. tech-advanced-furnace.webp) even though they never go
+  // through this function — index.html references those paths directly.
   function entityIcon(id) {
     const img = document.createElement("img");
     img.className = "entity-icon";
