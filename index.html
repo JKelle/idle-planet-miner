@@ -17,8 +17,8 @@
     <p class="tagline">
       Edit your in-game stats and see which alloy or item is most profitable to
       smelt or craft, per second. The numbers below are one player's save —
-      edit the sell prices and unlock toggles in the Stats section to
-      match your own game.
+      edit the stars, market rolls, bonuses, and unlock toggles in the Stats
+      section to match your own game.
     </p>
   </header>
 
@@ -69,9 +69,9 @@
     <section class="card techs-card" aria-label="Researched tech">
       <h2>Researched tech</h2>
       <p class="card-sub">
-        Tick a tech to see what researching it would do to alloy sell prices,
-        smelt times, and ingredient costs. Leave a tech off if the numbers
-        you entered above already include it.
+        Tick a tech to see what researching it would do to alloy/item sell
+        prices, smelt times, and ingredient costs. Base prices never include
+        these bonuses, so a toggle simply means "I've researched this".
       </p>
       <div class="techs-list">
         <label class="tech-toggle">
@@ -99,6 +99,45 @@
           <img class="entity-icon" src="assets/icons/tech-superior-alloy-value.webp" alt="" />
           Superior Alloy Value — all alloy values ×1.2
         </label>
+        <label class="tech-toggle">
+          <input type="checkbox" id="tech-advanced-item-value" />
+          Advanced Item Value — all item values ×1.2
+        </label>
+        <label class="tech-toggle">
+          <input type="checkbox" id="tech-superior-item-value" />
+          Superior Item Value — all item values ×1.2
+        </label>
+      </div>
+    </section>
+
+    <section class="card bonuses-card" aria-label="Sell price bonuses">
+      <h2>Sell price bonuses</h2>
+      <p class="card-sub">
+        These stack multiplicatively with base price, stars, and researched
+        tech to make each entity's effective sell price.
+      </p>
+      <div class="bonus-grid">
+        <div class="control-group">
+          <label class="control-label" for="bonus-sales-room">Sales room (alloys &amp; items)</label>
+          <input type="number" id="bonus-sales-room" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-station-ore">Station value — ores</label>
+          <input type="number" id="bonus-station-ore" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-station-alloy">Station value — alloys</label>
+          <input type="number" id="bonus-station-alloy" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-station-item">Station value — items</label>
+          <input type="number" id="bonus-station-item" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-marketing-room">Marketing room</label>
+          <input type="number" id="bonus-marketing-room" min="0" step="any" />
+          <span class="control-hint">Scales positive market boosts only</span>
+        </div>
       </div>
     </section>
 
@@ -115,7 +154,9 @@
     <section class="card stats-card" aria-label="Stats">
       <h2>Stats</h2>
       <p class="card-sub">
-        Edit sell price, time, and ingredient amounts inline. Ores
+        Edit stars, market roll, time, and ingredient amounts inline. Base
+        price and effective sell price are shown but not directly editable —
+        sell price is base price × stars × the bonuses above. Ores
         have no craft time or ingredients and never appear in the chart. Tick
         entities on as you unlock them in-game — turning one on also turns on
         everything it needs; turning one off also turns off anything that needs
@@ -131,6 +172,9 @@
               <th scope="col" class="col-name">Ore</th>
               <th></th>
               <th></th>
+              <th scope="col">Base price</th>
+              <th scope="col">Stars</th>
+              <th scope="col">Market</th>
               <th scope="col">Sell price</th>
             </tr>
           </thead>
@@ -147,6 +191,9 @@
               <th scope="col" class="col-name">Alloy</th>
               <th scope="col">Smelt time</th>
               <th scope="col" class="col-ingredients">Ingredients</th>
+              <th scope="col">Base price</th>
+              <th scope="col">Stars</th>
+              <th scope="col">Market</th>
               <th scope="col">Sell price</th>
             </tr>
           </thead>
@@ -163,6 +210,9 @@
               <th scope="col" class="col-name">Item</th>
               <th scope="col">Craft time</th>
               <th scope="col" class="col-ingredients">Ingredients</th>
+              <th scope="col">Base price</th>
+              <th scope="col">Stars</th>
+              <th scope="col">Market</th>
               <th scope="col">Sell price</th>
             </tr>
           </thead>

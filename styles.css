@@ -187,6 +187,26 @@ select {
   cursor: pointer;
 }
 
+/* ---- sell price bonuses ---- */
+.bonus-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.bonus-grid input {
+  font: inherit;
+  width: 90px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.control-hint {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
 /* ---- chart ---- */
 .chart-legend {
   display: flex;
@@ -232,10 +252,11 @@ select {
 
 .stat-table {
   width: 100%;
-  /* Widened for the time/ingredients/sell-price columns below, which need
-   * room for a raw field plus a linked "effective" field when a researched
-   * tech changes an alloy's numbers (see .eff-arrow/.eff-input). */
-  min-width: 1100px;
+  /* Widened for the time/ingredients columns, which need room for a raw
+   * field plus a linked "effective" field when a researched tech changes an
+   * alloy's numbers (see .eff-arrow/.eff-input), plus the four price columns
+   * (base price, stars, market, sell price). */
+  min-width: 1150px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.85rem;
@@ -253,17 +274,32 @@ select {
 
 .stat-table th:nth-child(3),
 .stat-table td:nth-child(3) {
-  width: 190px;
+  width: 170px;
 }
 
 .stat-table th:nth-child(4),
 .stat-table td:nth-child(4) {
-  width: 320px;
+  width: 300px;
 }
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 360px;
+  width: 110px;
+}
+
+.stat-table th:nth-child(6),
+.stat-table td:nth-child(6) {
+  width: 70px;
+}
+
+.stat-table th:nth-child(7),
+.stat-table td:nth-child(7) {
+  width: 90px;
+}
+
+.stat-table th:nth-child(8),
+.stat-table td:nth-child(8) {
+  width: 120px;
 }
 
 .stat-table th,
@@ -297,17 +333,10 @@ select {
   text-align: right;
 }
 
-/* Sell price is edited as a number + suffix dropdown, side by side. Flexed on
- * an inner wrapper, not the <td> itself — display:flex on a table cell would
- * opt it out of the table's column-width sharing with its header cell. */
-.price-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 /* Wraps a raw stat field and, when a researched tech applies, its linked
- * "effective" field — same reasoning as .price-wrap above. */
+ * "effective" field — display:flex on the <td> itself would opt it out of
+ * the table's column-width sharing with its header cell, so this flexes an
+ * inner wrapper instead. */
 .stat-wrap {
   display: inline-flex;
   align-items: center;
@@ -322,17 +351,19 @@ select {
   color: var(--text-soft);
 }
 
-.price-prefix {
+/* Base price and effective sell price: computed, not directly editable. */
+.price-readonly {
   color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
 }
 
-.price-num {
-  width: 90px;
+.stat-table td.price-readonly[data-eff-for] {
+  color: var(--text);
+  font-weight: 600;
 }
 
-.price-suffix {
-  width: 54px;
-  padding: 4px 2px;
+.market-select {
+  width: 78px;
 }
 
 .stat-table input.invalid {

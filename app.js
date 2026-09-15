@@ -10,7 +10,18 @@
   "use strict";
 
   const STORAGE_KEY = "ipm-explorer-v1";
-  const STAT_KEYS = ["sellPrice", "smeltTimeSeconds"];
+  const STAT_KEYS = ["stars", "market", "smeltTimeSeconds"];
+
+  // Numeric global-bonus control keys added in v3 — validated the same way as
+  // STAT_KEYS (finite, non-negative) so a corrupted/hand-edited import can't
+  // poison every price calculation with NaN or a negative multiplier.
+  const BONUS_CONTROL_KEYS = [
+    "salesRoom",
+    "stationOre",
+    "stationAlloy",
+    "stationItem",
+    "marketingRoom",
+  ];
 
   // Bump this whenever a stat key is removed/renamed or an override's shape
   // changes, and add a migration step in normalizeState below. Never change
@@ -18,12 +29,24 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 2;
+  const STORAGE_VERSION = 3;
+
+  // Market roll presets, matching what the in-game Market dialog offers.
+  const MARKET_OPTIONS = [
+    { value: 1, label: "—" },
+    { value: 0.33, label: "×0.33" },
+    { value: 0.5, label: "×0.5" },
+    { value: 2, label: "×2" },
+    { value: 3, label: "×3" },
+    { value: 4, label: "×4" },
+    { value: 5, label: "×5" },
+  ];
 
   // model.js declares these as globals in the browser (classic script). Bridge
   // them onto one object so the rest of this file reads uniformly.
   window.__model = {
     sellPrice,
+    sellPriceParts,
     netIngredientMaterialCost,
     totalTimeToCreate,
     profitPerSecond,
@@ -32,21 +55,11 @@
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
-    splitCompact,
     SUFFIX_TIERS,
     formatDuration,
     formatDurationCompact,
     parseDuration,
   };
-
-  // Sell-price suffix dropdown, low to high, plus a "—" entry for the bare
-  // (×1) tier. SUFFIX_TIERS itself is ordered high to low (largest-first,
-  // for formatCompact's lookup), so build this the other way round.
-  const SUFFIX_OPTIONS = [{ value: "", mult: 1 }].concat(
-    SUFFIX_TIERS.slice()
-      .reverse()
-      .map(([mult, value]) => ({ value, mult }))
-  );
 
   const DEFAULT_BY_ID = {};
   for (const e of DEFAULT_ENTITIES) DEFAULT_BY_ID[e.id] = e;
@@ -79,8 +92,21 @@
       techAdvancedFurnace: false,
       techSmeltingEfficiency: false,
       techSuperiorFurnace: false,
-      techAdvancedAlloyValue: false,
-      techSuperiorAlloyValue: false,
+      // Value-project defaults are `true` (unlike the other techs) so that a
+      // fresh save reproduces the old baked-in sellPrice values, which always
+      // assumed Advanced+Superior Alloy Value and Advanced Item Value — see
+      // profit.py's fixed 1.44 / 1.20 category bonuses.
+      techAdvancedAlloyValue: true,
+      techSuperiorAlloyValue: true,
+      techAdvancedItemValue: true,
+      techSuperiorItemValue: false,
+      // Global sell-price bonuses. Defaults reproduce profit.py's fixed
+      // per-category constants (Alloy 1.04/1.45, Item 1.04/1.45).
+      salesRoom: 1.45,
+      stationOre: 1.0,
+      stationAlloy: 1.04,
+      stationItem: 1.04,
+      marketingRoom: 1.0,
     };
   }
 
@@ -117,13 +143,36 @@
       // v1 -> v2: stars/baseSellPrice/marketBoost were replaced by a single
       // directly-editable sellPrice and are dropped rather than migrated —
       // there's no sound way to derive one from the others post hoc.
+      // v2 -> v3: sellPrice itself was replaced by a fixed basePrice (in
+      // data.js) times editable stars/market/global bonuses. A saved
+      // sellPrice override already has every bonus baked in and can't be
+      // split back apart, so it's dropped here the same way.
       if (Object.keys(entry).length) clean[id] = entry;
+    }
+
+    const parsedControls = (parsed && parsed.controls) || {};
+    const incomingControls = Object.assign({}, parsedControls);
+    if (!parsed || typeof parsed.version !== "number" || parsed.version < 3) {
+      // v2 -> v3: under v2, "off" meant "already included in the sellPrice I
+      // typed in" — under v3 it means "not researched". A saved `false` here
+      // would otherwise win over the new `true` defaults (see
+      // defaultControls) and silently cut every alloy/item price by up to
+      // 1.44x/1.2x. Deleting lets the v3 defaults take over below.
+      delete incomingControls.techAdvancedAlloyValue;
+      delete incomingControls.techSuperiorAlloyValue;
+      delete incomingControls.techAdvancedItemValue;
+      delete incomingControls.techSuperiorItemValue;
+    }
+    for (const k of BONUS_CONTROL_KEYS) {
+      if (!(typeof incomingControls[k] === "number" && isFinite(incomingControls[k]) && incomingControls[k] > 0)) {
+        delete incomingControls[k];
+      }
     }
 
     return {
       version: STORAGE_VERSION,
       overrides: clean,
-      controls: Object.assign(defaultControls(), (parsed && parsed.controls) || {}),
+      controls: Object.assign(defaultControls(), incomingControls),
     };
   }
 
@@ -146,6 +195,9 @@
   }
 
   // ---- resolution ---------------------------------------------------------
+  // Builds an entity with defaults + overrides merged, and its sellPrice
+  // fully resolved via sellPriceParts (basePrice x stars x the global
+  // bonuses). basePrice itself is never overridable — see data.js.
   function resolved(id) {
     const base = DEFAULT_BY_ID[id];
     const ov = state.overrides[id] || {};
@@ -154,13 +206,17 @@
       id: base.id,
       name: base.name,
       category: base.category,
+      basePrice: base.basePrice,
+      stars: pick(ov.stars, base.stars),
+      market: pick(ov.market, 1),
       ingredients: base.ingredients.map((i) => ({
         sellableId: i.sellableId,
         amount: pick(ovIng[i.sellableId], i.amount),
       })),
-      sellPrice: pick(ov.sellPrice, base.sellPrice),
       smeltTimeSeconds: pick(ov.smeltTimeSeconds, base.smeltTimeSeconds),
     };
+    out.priceParts = F().sellPriceParts(out, state.controls);
+    out.sellPrice = out.priceParts.effective;
     return out;
   }
 
@@ -180,22 +236,21 @@
     return m;
   }
 
-  // Layers the researched-tech multipliers on top of resolved() — only alloys
-  // are affected (smelters make alloys; items change only indirectly, through
-  // the recipe recursion over their alloy ingredients).
+  // Layers the smelter-speed/ingredient researched-tech multipliers on top of
+  // resolved() — only alloys are affected (smelters make alloys; items change
+  // only indirectly, through the recipe recursion over their alloy
+  // ingredients). sellPrice is already fully resolved by resolved() and is
+  // untouched here — value-project bonuses are part of sellPriceParts, not
+  // techMultipliers.
   function withTechs(entity, mults) {
     if (entity.category !== "alloy") return entity;
-    return {
-      id: entity.id,
-      name: entity.name,
-      category: entity.category,
+    return Object.assign({}, entity, {
       ingredients: entity.ingredients.map((i) => ({
         sellableId: i.sellableId,
         amount: i.amount * mults.ingredient,
       })),
-      sellPrice: entity.sellPrice * mults.sellPrice,
       smeltTimeSeconds: entity.smeltTimeSeconds * mults.smeltTimeSeconds,
-    };
+    });
   }
 
   function effectiveMap() {
@@ -399,7 +454,6 @@
     const isAlloy = category === "alloy";
     const timeMult = isAlloy ? mults.smeltTimeSeconds : 1;
     const ingredientMult = isAlloy ? mults.ingredient : 1;
-    const sellPriceMult = isAlloy ? mults.sellPrice : 1;
 
     const tbody = document.getElementById(tbodyId);
     tbody.innerHTML = "";
@@ -441,7 +495,7 @@
         renderIngredientCell(tr, e, base.id, ingredientMult);
       }
 
-      renderSellPriceCell(tr, e, base.id, sellPriceMult);
+      renderPriceCells(tr, e, base.id);
       tbody.appendChild(tr);
     }
   }
@@ -538,128 +592,94 @@
     td.appendChild(wrap);
   }
 
-  // Builds one $ + number + K/M/B/... suffix-dropdown widget (instead of one
-  // free-text field) so the player can type digits and hit Enter without
-  // reaching for a suffix letter. Shared by the raw and effective sell-price
-  // fields — `onCommit` receives the fully-expanded value the player entered.
-  function buildPriceWidget(entity, ariaLabel, value, onCommit) {
-    const prefix = document.createElement("span");
-    prefix.className = "price-prefix";
-    prefix.textContent = "$";
+  // Renders the four price cells: read-only base price, editable stars,
+  // editable market roll, and read-only effective sell price (the product of
+  // basePrice, stars, market, and the global bonus controls — see
+  // sellPriceParts in model.js). Only stars/market are per-entity; the rest
+  // come from the "Sell price bonuses" card and apply across every row.
+  function renderPriceCells(tr, entity, id) {
+    const tdBase = cell(tr);
+    tdBase.className = "price-readonly";
+    tdBase.textContent = F().formatMoney(entity.basePrice);
 
-    const numInput = document.createElement("input");
-    numInput.type = "number";
-    numInput.step = "any";
-    numInput.min = "0";
-    numInput.className = "price-num";
-    numInput.setAttribute("aria-label", ariaLabel);
-
-    const select = document.createElement("select");
-    select.className = "price-suffix";
-    for (const opt of SUFFIX_OPTIONS) {
-      const option = document.createElement("option");
-      option.value = opt.value;
-      option.textContent = opt.value || "—";
-      select.appendChild(option);
-    }
-    select.setAttribute("aria-label", `${ariaLabel} suffix`);
-
-    function setValue(v) {
-      const { mantissa, suffix } = F().splitCompact(v);
-      numInput.value = String(mantissa);
-      select.value = suffix;
-    }
-    setValue(value);
-
-    function commit() {
-      const raw = numInput.value.trim();
+    const tdStars = cell(tr);
+    const starsInput = document.createElement("input");
+    starsInput.type = "number";
+    starsInput.min = "0";
+    starsInput.step = "1";
+    starsInput.className = "stars-input";
+    starsInput.value = String(entity.stars);
+    starsInput.setAttribute("aria-label", `${entity.name} stars`);
+    starsInput.addEventListener("input", () => {
+      const raw = starsInput.value.trim();
       const n = Number(raw);
-      const ok = raw !== "" && isFinite(n) && n >= 0;
-      numInput.classList.toggle("invalid", !ok);
+      const ok = raw !== "" && isFinite(n) && n >= 0 && Number.isInteger(n);
+      starsInput.classList.toggle("invalid", !ok);
       if (!ok) return;
-      const mult = SUFFIX_OPTIONS.find((o) => o.value === select.value).mult;
-      onCommit(n * mult);
-    }
-
-    numInput.addEventListener("input", commit);
-    select.addEventListener("change", commit);
-
-    // A <td> can't safely be display:flex — that would opt it out of the
-    // table's column-width sharing with its header cell. Flex an inner
-    // wrapper instead so the cell itself stays a normal table-cell box.
-    const wrap = document.createElement("span");
-    wrap.className = "price-wrap";
-    wrap.appendChild(prefix);
-    wrap.appendChild(numInput);
-    wrap.appendChild(select);
-    return { wrap, numInput, setValue };
-  }
-
-  // `mult` is the researched-tech sell-price multiplier (1 = no effect).
-  // When it isn't 1, a second "effective" widget is shown alongside the raw
-  // one the player edits — either can be typed into, and they stay linked.
-  function renderSellPriceCell(tr, entity, id, mult) {
-    const td = cell(tr);
-    const outer = document.createElement("span");
-    outer.className = "stat-wrap";
-
-    const raw = buildPriceWidget(
-      entity,
-      `${entity.name} sellPrice`,
-      entity.sellPrice,
-      (n) => {
-        setStat(id, "sellPrice", n);
-        if (eff) eff.setValue(n * mult);
-        renderChart();
-      }
-    );
-    raw.numInput.addEventListener("keydown", (ev) => {
+      setStat(id, "stars", n);
+      updateEffectivePriceCell(id);
+      renderChart();
+    });
+    starsInput.addEventListener("keydown", (ev) => {
       if (ev.key !== "Enter") return;
       ev.preventDefault();
-      focusNextSellPriceInput(raw.numInput);
+      focusNextStarsInput(starsInput);
     });
-    outer.appendChild(raw.wrap);
+    tdStars.appendChild(starsInput);
 
-    let eff = null;
-    if (mult !== 1) {
-      const arrow = document.createElement("span");
-      arrow.className = "eff-arrow";
-      arrow.textContent = "→";
-      outer.appendChild(arrow);
-
-      eff = buildPriceWidget(
-        entity,
-        `${entity.name} sellPrice (effective)`,
-        entity.sellPrice * mult,
-        (n) => {
-          const base = n / mult;
-          setStat(id, "sellPrice", base);
-          raw.setValue(base);
-          renderChart();
-        }
-      );
-      eff.wrap.classList.add("eff-input");
-      outer.appendChild(eff.wrap);
+    const tdMarket = cell(tr);
+    const marketSelect = document.createElement("select");
+    marketSelect.className = "market-select";
+    marketSelect.setAttribute("aria-label", `${entity.name} market`);
+    for (const opt of MARKET_OPTIONS) {
+      const option = document.createElement("option");
+      option.value = String(opt.value);
+      option.textContent = opt.label;
+      marketSelect.appendChild(option);
     }
+    marketSelect.value = String(entity.market);
+    marketSelect.addEventListener("change", () => {
+      setStat(id, "market", Number(marketSelect.value));
+      updateEffectivePriceCell(id);
+      renderChart();
+    });
+    tdMarket.appendChild(marketSelect);
 
-    td.appendChild(outer);
+    const tdEff = cell(tr);
+    tdEff.className = "price-readonly";
+    tdEff.dataset.effFor = id;
+    tdEff.textContent = F().formatMoney(entity.sellPrice);
   }
 
-  // Move focus to the next unlocked row's raw sell-price field, wrapping
-  // around (skips the effective one, so Enter never jumps into it). If
+  // Move focus to the next unlocked row's stars field, wrapping around. If
   // `current` isn't itself in that list (e.g. its row just got locked), jump
   // to the first one instead.
-  function focusNextSellPriceInput(current) {
+  function focusNextStarsInput(current) {
     const inputs = Array.from(
-      document.querySelectorAll(
-        ".stat-table tr:not(.locked) .price-wrap:not(.eff-input) .price-num"
-      )
+      document.querySelectorAll(".stat-table tr:not(.locked) .stars-input")
     );
     if (inputs.length === 0) return;
     const idx = inputs.indexOf(current);
     const next = inputs[idx === -1 ? 0 : (idx + 1) % inputs.length];
     next.focus();
     next.select();
+  }
+
+  // Rewrite one row's effective-price cell in place (used after a per-row
+  // stars/market edit) without rebuilding the table, so focus/caret survive.
+  function updateEffectivePriceCell(id) {
+    const td = document.querySelector(`.price-readonly[data-eff-for="${id}"]`);
+    if (!td) return;
+    td.textContent = F().formatMoney(resolved(id).sellPrice);
+  }
+
+  // Rewrite every row's effective-price cell (used after a global bonus
+  // control changes, since that shifts every entity's price at once) without
+  // rebuilding the table, so the focused control keeps its caret.
+  function refreshEffectivePrices() {
+    for (const td of document.querySelectorAll(".price-readonly[data-eff-for]")) {
+      td.textContent = F().formatMoney(resolved(td.dataset.effFor).sellPrice);
+    }
   }
 
   // `mult` is the researched-tech ingredient-cost multiplier (1 = no effect).
@@ -747,6 +767,18 @@
     ["tech-superior-furnace", "techSuperiorFurnace"],
     ["tech-advanced-alloy-value", "techAdvancedAlloyValue"],
     ["tech-superior-alloy-value", "techSuperiorAlloyValue"],
+    ["tech-advanced-item-value", "techAdvancedItemValue"],
+    ["tech-superior-item-value", "techSuperiorItemValue"],
+  ];
+
+  // Input id <-> controls key for each global sell-price bonus. Shared by
+  // initControls (wiring) and syncControlsUI (post-import resync).
+  const BONUS_INPUTS = [
+    ["bonus-sales-room", "salesRoom"],
+    ["bonus-station-ore", "stationOre"],
+    ["bonus-station-alloy", "stationAlloy"],
+    ["bonus-station-item", "stationItem"],
+    ["bonus-marketing-room", "marketingRoom"],
   ];
 
   // ---- controls ----------------------------------------------------
@@ -771,6 +803,22 @@
         // Techs change the stat table's effective fields too, not just the
         // chart, so this needs the full re-render (unlike the other controls).
         renderAll();
+      });
+    }
+
+    for (const [inputId, key] of BONUS_INPUTS) {
+      const input = document.getElementById(inputId);
+      input.value = String(state.controls[key]);
+      input.addEventListener("input", () => {
+        const raw = input.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && n > 0;
+        input.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        state.controls[key] = n;
+        saveState();
+        refreshEffectivePrices();
+        renderChart();
       });
     }
 
@@ -858,6 +906,9 @@
     }
     for (const [checkboxId, key] of TECH_TOGGLES) {
       document.getElementById(checkboxId).checked = state.controls[key];
+    }
+    for (const [inputId, key] of BONUS_INPUTS) {
+      document.getElementById(inputId).value = String(state.controls[key]);
     }
   }
 

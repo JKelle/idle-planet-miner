@@ -13,9 +13,42 @@ function get(byId, id) {
   return e;
 }
 
-// `entity.sellPrice` is the price the player enters directly.
+// `entity.sellPrice` is the fully-resolved effective price (basePrice run
+// through sellPriceParts), computed once per render pass in app.js.
 function sellPrice(entity) {
   return entity.sellPrice;
+}
+
+// Multiplicative decomposition of a sellable's price, mirroring profit.py's
+// get_sell_price. Ores get no sales-room or value-project bonus — those are
+// alloy/item-only in-game. The Marketing room scales positive market boosts
+// only (a x3 market at Marketing 2.50 sells for x7.5); a glut market (< 1) is
+// never scaled.
+function sellPriceParts(entity, controls) {
+  const base = entity.basePrice;
+  const star = 1 + 0.2 * entity.stars;
+
+  const isOre = entity.category === "ore";
+  const on = (k) => (controls && controls[k] ? 1 : 0);
+  const tech = isOre
+    ? 1
+    : entity.category === "alloy"
+    ? Math.pow(1.2, on("techAdvancedAlloyValue") + on("techSuperiorAlloyValue"))
+    : Math.pow(1.2, on("techAdvancedItemValue") + on("techSuperiorItemValue"));
+
+  const station = isOre
+    ? controls.stationOre
+    : entity.category === "alloy"
+    ? controls.stationAlloy
+    : controls.stationItem;
+
+  const sales = isOre ? 1 : controls.salesRoom;
+
+  const rawMarket = typeof entity.market === "number" ? entity.market : 1;
+  const market = rawMarket > 1 ? rawMarket * controls.marketingRoom : rawMarket;
+
+  const effective = base * star * tech * station * sales * market;
+  return { base, star, tech, station, sales, market, effective };
 }
 
 // Recursive raw-ore cost of an entity's ingredients. Non-ore ingredients
@@ -60,14 +93,15 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Research-project multipliers, expressed so that effective = base * mult.
-// All five projects affect smelters (alloys) only; items change only through
-// their alloy ingredients, which the recipe recursion already handles.
+// Research-project multipliers for smelters, expressed so that
+// effective = base * mult. All three affect alloys only; items change only
+// through their alloy ingredients, which the recipe recursion already
+// handles. Value-project bonuses (Advanced/Superior Alloy/Item Value) are
+// handled separately by sellPriceParts, since they apply to items too.
 function techMultipliers(techs) {
   const on = (k) => (techs && techs[k] ? 1 : 0);
   const speed = Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace"));
   return {
-    sellPrice: Math.pow(1.2, on("techAdvancedAlloyValue") + on("techSuperiorAlloyValue")),
     smeltTimeSeconds: 1 / speed,
     ingredient: on("techSmeltingEfficiency") ? 0.8 : 1,
   };
@@ -114,21 +148,6 @@ function formatCompact(value) {
   }
   if (abs >= 1e33) return `${sign}${abs.toExponential(3)}`;
   return `${sign}${sig4(abs)}`;
-}
-
-// Split a value into an editable (mantissa, suffix) pair for the sell-price
-// number + dropdown controls — the inverse of formatCompact, but returning
-// parts instead of a string. Values past the N tier still get a (huge)
-// mantissa under "N" rather than becoming unrepresentable in the controls.
-function splitCompact(value) {
-  const sign = value < 0 ? -1 : 1;
-  const abs = Math.abs(value);
-  for (const [threshold, suffix] of SUFFIX_TIERS) {
-    if (abs >= threshold) {
-      return { mantissa: sign * Number(sig4(abs / threshold)), suffix };
-    }
-  }
-  return { mantissa: sign * Number(sig4(abs)), suffix: "" };
 }
 
 // Mimic Python's "%.4g": up to 4 significant digits, no trailing zeros.
@@ -186,6 +205,7 @@ function parseDuration(str) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     sellPrice,
+    sellPriceParts,
     netIngredientMaterialCost,
     totalTimeToCreate,
     profitPerSecond,
@@ -194,7 +214,6 @@ if (typeof module !== "undefined" && module.exports) {
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
-    splitCompact,
     SUFFIX_TIERS,
     formatDuration,
     formatDurationCompact,
