@@ -9,7 +9,7 @@
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
   <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=1" />
 </head>
 <body>
   <header class="site-header">
@@ -223,8 +223,11 @@
   </main>
 
   <script src="vendor/chart.umd.js"></script>
-  <script src="data.js"></script>
-  <script src="model.js"></script>
-  <script src="app.js"></script>
+  <!-- ?v=N cache-busts GitHub Pages' 10-minute asset cache against this
+       file's own caching, so a freshly-loaded page never runs stale JS/CSS
+       against fresh markup. Bump v on any deploy touching these 4 files. -->
+  <script src="data.js?v=1"></script>
+  <script src="model.js?v=1"></script>
+  <script src="app.js?v=1"></script>
 </body>
 </html>
