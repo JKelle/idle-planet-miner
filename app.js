@@ -92,6 +92,9 @@
       techAdvancedFurnace: false,
       techSmeltingEfficiency: false,
       techSuperiorFurnace: false,
+      techAdvancedCrafting: false,
+      techSuperiorCrafting: false,
+      techCraftingEfficiency: false,
       // Value-project defaults are `true` (unlike the other techs) so that a
       // fresh save reproduces the old baked-in sellPrice values, which always
       // assumed Advanced+Superior Alloy Value and Advanced Item Value — see
@@ -236,20 +239,20 @@
     return m;
   }
 
-  // Layers the smelter-speed/ingredient researched-tech multipliers on top of
-  // resolved() — only alloys are affected (smelters make alloys; items change
-  // only indirectly, through the recipe recursion over their alloy
-  // ingredients). sellPrice is already fully resolved by resolved() and is
-  // untouched here — value-project bonuses are part of sellPriceParts, not
-  // techMultipliers.
+  // Layers the smelter/crafter speed and ingredient researched-tech
+  // multipliers on top of resolved() — ores have no entry in `mults` (no
+  // craft time, no ingredients) and pass through unchanged. sellPrice is
+  // already fully resolved by resolved() and is untouched here —
+  // value-project bonuses are part of sellPriceParts, not techMultipliers.
   function withTechs(entity, mults) {
-    if (entity.category !== "alloy") return entity;
+    const m = mults[entity.category];
+    if (!m) return entity;
     return Object.assign({}, entity, {
       ingredients: entity.ingredients.map((i) => ({
         sellableId: i.sellableId,
-        amount: i.amount * mults.ingredient,
+        amount: i.amount * m.ingredient,
       })),
-      smeltTimeSeconds: entity.smeltTimeSeconds * mults.smeltTimeSeconds,
+      smeltTimeSeconds: entity.smeltTimeSeconds * m.smeltTimeSeconds,
     });
   }
 
@@ -448,12 +451,13 @@
 
   function renderStatTable(tbodyId, category) {
     const byId = resolvedMap();
-    // Researched-tech multipliers only apply to alloys (smelters); ores and
-    // items always get the identity multiplier so no "effective" field shows.
+    // Researched-tech multipliers apply per-category (alloy or item); ores
+    // have no entry and always get the identity multiplier so no "effective"
+    // field shows.
     const mults = F().techMultipliers(state.controls);
-    const isAlloy = category === "alloy";
-    const timeMult = isAlloy ? mults.smeltTimeSeconds : 1;
-    const ingredientMult = isAlloy ? mults.ingredient : 1;
+    const m = mults[category];
+    const timeMult = m ? m.smeltTimeSeconds : 1;
+    const ingredientMult = m ? m.ingredient : 1;
 
     const tbody = document.getElementById(tbodyId);
     tbody.innerHTML = "";
@@ -765,6 +769,9 @@
     ["tech-advanced-furnace", "techAdvancedFurnace"],
     ["tech-smelting-efficiency", "techSmeltingEfficiency"],
     ["tech-superior-furnace", "techSuperiorFurnace"],
+    ["tech-advanced-crafting", "techAdvancedCrafting"],
+    ["tech-superior-crafting", "techSuperiorCrafting"],
+    ["tech-crafting-efficiency", "techCraftingEfficiency"],
     ["tech-advanced-alloy-value", "techAdvancedAlloyValue"],
     ["tech-superior-alloy-value", "techSuperiorAlloyValue"],
     ["tech-advanced-item-value", "techAdvancedItemValue"],

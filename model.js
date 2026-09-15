@@ -93,17 +93,25 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Research-project multipliers for smelters, expressed so that
-// effective = base * mult. All three affect alloys only; items change only
-// through their alloy ingredients, which the recipe recursion already
-// handles. Value-project bonuses (Advanced/Superior Alloy/Item Value) are
-// handled separately by sellPriceParts, since they apply to items too.
+// Research-project multipliers for smelters (alloys) and crafting stations
+// (items), keyed by category, expressed so that effective = base * mult.
+// Ores have no entry (no craft time, no ingredients) — callers treat a
+// missing category as the identity multiplier. Value-project bonuses
+// (Advanced/Superior Alloy/Item Value) are handled separately by
+// sellPriceParts, since they apply to items too.
 function techMultipliers(techs) {
   const on = (k) => (techs && techs[k] ? 1 : 0);
-  const speed = Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace"));
+  const smelterSpeed = Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace"));
+  const crafterSpeed = Math.pow(1.2, on("techAdvancedCrafting") + on("techSuperiorCrafting"));
   return {
-    smeltTimeSeconds: 1 / speed,
-    ingredient: on("techSmeltingEfficiency") ? 0.8 : 1,
+    alloy: {
+      smeltTimeSeconds: 1 / smelterSpeed,
+      ingredient: on("techSmeltingEfficiency") ? 0.8 : 1,
+    },
+    item: {
+      smeltTimeSeconds: 1 / crafterSpeed,
+      ingredient: on("techCraftingEfficiency") ? 0.8 : 1,
+    },
   };
 }
 
