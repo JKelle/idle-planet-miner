@@ -20,10 +20,11 @@ function sellPrice(entity) {
 }
 
 // Multiplicative decomposition of a sellable's price, mirroring profit.py's
-// get_sell_price. Ores get no sales-room or value-project bonus — those are
-// alloy/item-only in-game. The Marketing room scales positive market boosts
-// only (a x3 market at Marketing 2.50 sells for x7.5); a glut market (< 1) is
-// never scaled.
+// get_sell_price. Ores get no sales-room, station-value, or value-project
+// bonus — those are alloy/item-only in-game. Alloys and items share a single
+// station-value control since they always move together in-game. The
+// Marketing room scales positive market boosts only (a x3 market at
+// Marketing 2.50 sells for x7.5); a glut market (< 1) is never scaled.
 function sellPriceParts(entity, controls) {
   const base = entity.basePrice;
   const star = 1 + 0.2 * entity.stars;
@@ -36,11 +37,7 @@ function sellPriceParts(entity, controls) {
     ? Math.pow(1.2, on("techAdvancedAlloyValue") + on("techSuperiorAlloyValue"))
     : Math.pow(1.2, on("techAdvancedItemValue") + on("techSuperiorItemValue"));
 
-  const station = isOre
-    ? controls.stationOre
-    : entity.category === "alloy"
-    ? controls.stationAlloy
-    : controls.stationItem;
+  const station = isOre ? 1 : controls.station;
 
   const sales = isOre ? 1 : controls.salesRoom;
 

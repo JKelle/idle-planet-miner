@@ -17,9 +17,7 @@
   // poison every price calculation with NaN or a negative multiplier.
   const BONUS_CONTROL_KEYS = [
     "salesRoom",
-    "stationOre",
-    "stationAlloy",
-    "stationItem",
+    "station",
     "marketingRoom",
   ];
 
@@ -29,7 +27,7 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 3;
+  const STORAGE_VERSION = 4;
 
   // Market roll presets, matching what the in-game Market dialog offers.
   const MARKET_OPTIONS = [
@@ -104,11 +102,10 @@
       techAdvancedItemValue: true,
       techSuperiorItemValue: false,
       // Global sell-price bonuses. Defaults reproduce profit.py's fixed
-      // per-category constants (Alloy 1.04/1.45, Item 1.04/1.45).
+      // per-category constants (Alloy 1.04/1.45, Item 1.04/1.45). Ores have
+      // no station-value bonus in-game, so there's no stationOre control.
       salesRoom: 1.45,
-      stationOre: 1.0,
-      stationAlloy: 1.04,
-      stationItem: 1.04,
+      station: 1.04,
       marketingRoom: 1.0,
     };
   }
@@ -165,6 +162,25 @@
       delete incomingControls.techSuperiorAlloyValue;
       delete incomingControls.techAdvancedItemValue;
       delete incomingControls.techSuperiorItemValue;
+    }
+    if (!parsed || typeof parsed.version !== "number" || parsed.version < 4) {
+      // v3 -> v4: separate stationAlloy/stationItem controls merged into one
+      // `station` control (they always moved together in-game), and the
+      // stationOre control was removed (no such bonus exists in-game — ores
+      // always use station=1). Carry a player's stationAlloy (or, failing
+      // that, stationItem) value forward as `station` before the legacy keys
+      // are dropped below, so a customized value isn't silently reset to the
+      // default.
+      const legacyAlloy = incomingControls.stationAlloy;
+      const legacyItem = incomingControls.stationItem;
+      if (typeof legacyAlloy === "number" && isFinite(legacyAlloy) && legacyAlloy > 0) {
+        incomingControls.station = legacyAlloy;
+      } else if (typeof legacyItem === "number" && isFinite(legacyItem) && legacyItem > 0) {
+        incomingControls.station = legacyItem;
+      }
+      delete incomingControls.stationOre;
+      delete incomingControls.stationAlloy;
+      delete incomingControls.stationItem;
     }
     for (const k of BONUS_CONTROL_KEYS) {
       if (!(typeof incomingControls[k] === "number" && isFinite(incomingControls[k]) && incomingControls[k] > 0)) {
@@ -782,9 +798,7 @@
   // initControls (wiring) and syncControlsUI (post-import resync).
   const BONUS_INPUTS = [
     ["bonus-sales-room", "salesRoom"],
-    ["bonus-station-ore", "stationOre"],
-    ["bonus-station-alloy", "stationAlloy"],
-    ["bonus-station-item", "stationItem"],
+    ["bonus-station", "station"],
     ["bonus-marketing-room", "marketingRoom"],
   ];
 
