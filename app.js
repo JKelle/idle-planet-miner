@@ -12,22 +12,18 @@
   const STORAGE_KEY = "ipm-explorer-v1";
   const STAT_KEYS = ["stars", "market", "smeltTimeSeconds"];
 
-  // Numeric global-bonus control keys added in v3 — validated the same way as
-  // STAT_KEYS (finite, non-negative) so a corrupted/hand-edited import can't
-  // poison every price calculation with NaN or a negative multiplier.
-  const BONUS_CONTROL_KEYS = ["salesRoom", "station", "marketingRoom"];
-
-  // Level control keys (Rooms and, as of v5, Station nodes) -> max level (see
-  // roomSpeedMultiplier/roomIngredientMultiplier/stationNodeBonus in
-  // model.js). Integer levels where 0 is valid ("not purchased"), unlike
-  // BONUS_CONTROL_KEYS's multiplier fields where 0 would be nonsensical — so
-  // these get their own validation loop below rather than joining that list.
-  // Station node maxes mirror model.js's STATION_NODES table.
+  // Level control keys (Rooms and Station nodes) -> max level (see
+  // roomMultiplier/stationNodeBonus in model.js). Integer levels where 0 is
+  // valid ("not purchased"/"not researched"), validated by one loop in
+  // normalizeState below. Station node maxes mirror model.js's
+  // STATION_LADDERS table.
   const LEVEL_CONTROL_KEYS = {
     forgeLevel: 60,
     workshopLevel: 60,
     underforgeLevel: 11,
     dormLevel: 11,
+    salesRoomLevel: 60,
+    marketingRoomLevel: 60,
     smelting1: 5,
     smelting2: 10,
     smelting3: 15,
@@ -38,12 +34,26 @@
     crafting3: 15,
     crafting4: 20,
     crafting5: 20,
+    value1: 5,
+    value2: 5,
+    value3: 5,
+    value4: 4,
+    value5: 4,
+    value6: 2,
+    value7: 2,
   };
 
-  // Bonus-per-level for each Station node (1-indexed by position), mirroring
-  // model.js's STATION_NODES. Used only by the v4 -> v5 migration below to
-  // convert a saved raw multiplier back into a level.
+  // Bonus-per-level for each Smelting/Crafting Station node (1-indexed by
+  // position), mirroring model.js's STATION_LADDERS.smelting/.crafting.
+  // Used only by the v4 -> v5 migration below to convert a saved raw
+  // multiplier back into a level.
   const STATION_NODE_BONUS_PER_LEVEL = [0.01, 0.01, 0.01, 0.02, 0.04];
+
+  // Bonus-per-level for each Items & Alloys ("value") Station node, mirroring
+  // model.js's STATION_LADDERS.value. Used only by the v6 -> v7 migration
+  // below to spread a saved flat `station` multiplier across the 7 nodes.
+  const VALUE_NODE_BONUS_PER_LEVEL = [0.036, 0.08, 0.08, 0.02, 0.02, 0.075, 0.075];
+  const VALUE_NODE_MAX_LEVEL = [5, 5, 5, 4, 4, 2, 2];
 
   // Bump this whenever a stat key is removed/renamed or an override's shape
   // changes, and add a migration step in normalizeState below. Never change
@@ -51,7 +61,7 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 6;
+  const STORAGE_VERSION = 7;
 
   // Market roll presets, matching what the in-game Market dialog offers.
   const MARKET_OPTIONS = [
@@ -74,8 +84,7 @@
     profitPerSecond,
     newMemos,
     techMultipliers,
-    roomSpeedMultiplier,
-    roomIngredientMultiplier,
+    roomMultiplier,
     stationNodeBonus,
     stationCategoryMultiplier,
     effectiveIngredientAmount,
@@ -131,23 +140,24 @@
       techSuperiorAlloyValue: true,
       techAdvancedItemValue: true,
       techSuperiorItemValue: false,
-      // Global sell-price bonuses. Defaults reproduce profit.py's fixed
-      // per-category constants (Alloy 1.04/1.45, Item 1.04/1.45). Ores have
-      // no station-value bonus in-game, so there's no stationOre control.
-      salesRoom: 1.45,
-      station: 1.04,
-      marketingRoom: 1.0,
       managers: [],
-      // Forge/Workshop/Underforge/Dorm Mothership Room levels, and Station
-      // "Smelting"/"Crafting" tech-node levels (5 each) — see
-      // techMultipliers/stationCategoryMultiplier in model.js. 0 is a valid,
-      // common value here ("not purchased"/"not researched") — see
-      // LEVEL_CONTROL_KEYS below, which validates these separately from
-      // BONUS_CONTROL_KEYS for exactly that reason.
+      // Mothership Room levels (Forge/Workshop/Underforge/Dorm/Sales/
+      // Marketing) and Station tech-node levels (Smelting/Crafting 5 each,
+      // Items & Alloys "value" 7) — see techMultipliers/sellPriceParts in
+      // model.js. 0 is a valid, common value here ("not purchased"/"not
+      // researched") — see LEVEL_CONTROL_KEYS, which validates all of these.
+      // Defaults reproduce profit.py's fixed per-category constants (Alloy
+      // 1.04/1.45, Item 1.04/1.45): Sales level 7 -> x1.45, value4 level 2 ->
+      // x1.04 (2 x 0.02/lvl, the only exact-fit combination of the value
+      // ladder's per-node increments), Marketing level 0 -> x1.00 (no
+      // boosted market roll in the default save). Ores have no station-value
+      // or Sales/Marketing bonus in-game, so those never apply to ores.
       forgeLevel: 0,
       workshopLevel: 0,
       underforgeLevel: 0,
       dormLevel: 0,
+      salesRoomLevel: 7,
+      marketingRoomLevel: 0,
       smelting1: 0,
       smelting2: 0,
       smelting3: 0,
@@ -158,6 +168,13 @@
       crafting3: 0,
       crafting4: 0,
       crafting5: 0,
+      value1: 0,
+      value2: 0,
+      value3: 0,
+      value4: 2,
+      value5: 0,
+      value6: 0,
+      value7: 0,
       // Module effects — a 4th open-ended boost source alongside Managers.
       // Unlike Rooms, Modules have no documented level->effect formula (main
       // effects scale unpredictably and sub-effects are randomly rolled per
@@ -166,6 +183,20 @@
       // affect speed, ingredient cost, or sell value. See
       // moduleEffectMultiplier in model.js.
       moduleEffects: [],
+      // Which <details> disclosure groups start open. View state only (never
+      // affects the model), kept flat like the rest of `controls` so a saved
+      // partial object merges cleanly. Stat tables default open since stars/
+      // market rolls change often; everything else defaults closed.
+      open: {
+        tech: false,
+        rooms: false,
+        station: false,
+        managers: false,
+        modules: false,
+        ores: false,
+        alloys: true,
+        items: true,
+      },
     };
   }
 
@@ -256,9 +287,9 @@
       // convention as Rooms — see LEVEL_CONTROL_KEYS. Best-effort convert a
       // saved multiplier back into the nearest level via each node's
       // bonus-per-level (STATION_NODE_BONUS_PER_LEVEL, mirroring model.js's
-      // STATION_NODES) rather than dropping it, so an entered boost isn't
-      // silently lost. There was no node 5 before v5, so it's left for the
-      // v5 default (0) to fill in.
+      // STATION_LADDERS.smelting/.crafting) rather than dropping it, so an
+      // entered boost isn't silently lost. There was no node 5 before v5, so
+      // it's left for the v5 default (0) to fill in.
       ["smelting", "crafting"].forEach((prefix) => {
         for (let i = 1; i <= 4; i++) {
           const key = `${prefix}${i}`;
@@ -274,10 +305,63 @@
         }
       });
     }
-    for (const k of BONUS_CONTROL_KEYS) {
-      if (!(typeof incomingControls[k] === "number" && isFinite(incomingControls[k]) && incomingControls[k] > 0)) {
-        delete incomingControls[k];
+    if (!parsed || typeof parsed.version !== "number" || parsed.version < 7) {
+      // v6 -> v7: the "Sell price bonuses" card's three flat multipliers were
+      // replaced by levels in the systems they actually belong to. Sales and
+      // Marketing are Mothership Rooms (same level convention as Forge/
+      // Workshop/Underforge/Dorm since v5); Station "value" is a 7-node
+      // ladder alongside the Smelting/Crafting Station nodes. A flat
+      // multiplier has no unique decomposition into levels, so best-effort
+      // convert each rather than dropping the player's customization.
+      const legacySales = incomingControls.salesRoom;
+      if (typeof legacySales === "number" && isFinite(legacySales) && legacySales > 1) {
+        incomingControls.salesRoomLevel = Math.max(
+          0,
+          Math.min(60, Math.round((legacySales - 1.15) / 0.05) + 1)
+        );
       }
+      const legacyMarketing = incomingControls.marketingRoom;
+      if (typeof legacyMarketing === "number" && isFinite(legacyMarketing) && legacyMarketing > 1) {
+        incomingControls.marketingRoomLevel = Math.max(
+          0,
+          Math.min(60, Math.round((legacyMarketing - 1.3) / 0.1) + 1)
+        );
+      }
+      const legacyStation = incomingControls.station;
+      if (typeof legacyStation === "number" && isFinite(legacyStation) && legacyStation > 1) {
+        // Spread the flat multiplier's bonus (station - 1) across the value
+        // ladder's 7 nodes: fill the coarsest nodes first (.08/lvl, .075/lvl)
+        // since they're least able to hit an arbitrary target precisely,
+        // then settle whatever's left as precisely as possible on the
+        // ladder's finest nodes (.02/lvl), spilling into the .036/lvl node
+        // only if more bonus remains than the two .02 nodes can hold. This
+        // reproduces the pre-v7 default (station: 1.04) as exactly value4:
+        // 2 (2 x .02 = .04); other saved values land within a fraction of a
+        // percent, which doesn't affect chart ordering.
+        let remaining = Math.min(Math.max(legacyStation - 1, 0), 2.44);
+        const levels = [0, 0, 0, 0, 0, 0, 0];
+        for (const i of [1, 2, 5, 6]) {
+          const perLevel = VALUE_NODE_BONUS_PER_LEVEL[i];
+          const max = VALUE_NODE_MAX_LEVEL[i];
+          const take = Math.min(max, Math.floor(remaining / perLevel + 1e-9));
+          levels[i] = take;
+          remaining -= take * perLevel;
+        }
+        const fineLevels = Math.max(0, Math.min(8, Math.round(remaining / 0.02)));
+        levels[3] = Math.min(4, fineLevels);
+        levels[4] = Math.min(4, fineLevels - levels[3]);
+        remaining -= (levels[3] + levels[4]) * 0.02;
+        if (remaining > 0.018) {
+          levels[0] = Math.min(
+            VALUE_NODE_MAX_LEVEL[0],
+            levels[0] + Math.round(remaining / VALUE_NODE_BONUS_PER_LEVEL[0])
+          );
+        }
+        for (let i = 0; i < 7; i++) incomingControls[`value${i + 1}`] = levels[i];
+      }
+      delete incomingControls.salesRoom;
+      delete incomingControls.station;
+      delete incomingControls.marketingRoom;
     }
 
     for (const [k, max] of Object.entries(LEVEL_CONTROL_KEYS)) {
@@ -338,6 +422,18 @@
       cleanModuleEffects.push({ id, name, category, amount });
     }
     incomingControls.moduleEffects = cleanModuleEffects;
+
+    // `open` (disclosure-group state) is itself an object, so the top-level
+    // Object.assign below would replace it wholesale rather than merging —
+    // a partial saved `open` (e.g. from an older client, or a hand-edited
+    // import) would silently lose every key it didn't mention. Merge onto
+    // the default explicitly instead.
+    const rawOpen = incomingControls.open && typeof incomingControls.open === "object" ? incomingControls.open : {};
+    const cleanOpen = {};
+    for (const [k, def] of Object.entries(defaultControls().open)) {
+      cleanOpen[k] = typeof rawOpen[k] === "boolean" ? rawOpen[k] : def;
+    }
+    incomingControls.open = cleanOpen;
 
     return {
       version: STORAGE_VERSION,
@@ -945,77 +1041,246 @@
     ["tech-superior-item-value", "techSuperiorItemValue"],
   ];
 
-  // Input id <-> controls key for each global sell-price bonus. Shared by
-  // initControls (wiring) and syncControlsUI (post-import resync).
-  const BONUS_INPUTS = [
-    ["bonus-sales-room", "salesRoom"],
-    ["bonus-station", "station"],
-    ["bonus-marketing-room", "marketingRoom"],
+  // Every Mothership Room whose level feeds the price/speed model, generated
+  // into #rooms-grid by renderRoomsGrid below (there are now 6 — too many to
+  // keep hand-writing in index.html, especially once Sales/Marketing joined
+  // Forge/Workshop/Underforge/Dorm). `kind` selects the formula in
+  // model.js's roomMultiplier. Sales/Marketing change price only, not the
+  // stat tables' effective time/ingredient twins, so their edits use the
+  // caret-preserving tier-2 refresh instead of a full renderAll() — see
+  // priceOnly below.
+  const ROOMS = [
+    { key: "forgeLevel", label: "Forge", kind: "speed", max: 60, effect: "smelt speed" },
+    { key: "workshopLevel", label: "Workshop", kind: "speed", max: 60, effect: "craft speed" },
+    { key: "underforgeLevel", label: "Underforge", kind: "ingredient", max: 11, effect: "alloy ingredients" },
+    { key: "dormLevel", label: "Dorm", kind: "ingredient", max: 11, effect: "item ingredients" },
+    { key: "salesRoomLevel", label: "Sales", kind: "sales", max: 60, effect: "alloy & item sell price", priceOnly: true },
+    {
+      key: "marketingRoomLevel",
+      label: "Marketing",
+      kind: "marketing",
+      max: 60,
+      effect: "scales market rolls above ×1",
+      priceOnly: true,
+    },
   ];
 
-  // Input id <-> controls key <-> node index (0-4, into model.js's
-  // STATION_NODES) <-> max level, for each Station "Smelting"/"Crafting"
-  // tech node. Shared by initControls (wiring) and syncControlsUI
-  // (post-import resync). Unlike BONUS_INPUTS these feed techMultipliers
-  // (smelt/craft time), not just price, so their change handler triggers a
-  // full renderAll() the same way TECH_TOGGLES does. The per-node hint span
-  // id is derived from the input id; each category also has one
-  // "station-<prefix>-total-hint" span for its combined multiplier (see
-  // stationNodeHint/stationCategoryHint below).
-  const SPEED_STATION_INPUTS = [
-    ["bonus-smelting-1", "smelting1", 0, 5],
-    ["bonus-smelting-2", "smelting2", 1, 10],
-    ["bonus-smelting-3", "smelting3", 2, 15],
-    ["bonus-smelting-4", "smelting4", 3, 20],
-    ["bonus-smelting-5", "smelting5", 4, 20],
-    ["bonus-crafting-1", "crafting1", 0, 5],
-    ["bonus-crafting-2", "crafting2", 1, 10],
-    ["bonus-crafting-3", "crafting3", 2, 15],
-    ["bonus-crafting-4", "crafting4", 3, 20],
-    ["bonus-crafting-5", "crafting5", 4, 20],
-  ];
-
-  // Category prefixes for the Station node groups above — used to recompute
-  // that category's combined-multiplier hint whenever any of its nodes
-  // change (state.controls has `${prefix}1`..`${prefix}5`).
-  const STATION_CATEGORY_PREFIXES = ["smelting", "crafting"];
-
-  // Input id <-> controls key <-> formula kind <-> max level, for each
-  // Mothership Room whose level feeds techMultipliers. "speed" rooms
-  // (Forge/Workshop) use roomSpeedMultiplier; "ingredient" rooms
-  // (Underforge/Dorm) use roomIngredientMultiplier. Shared by initControls
-  // (wiring) and syncControlsUI (post-import resync); the hint span id is
-  // derived from the input id (bonus-smelting-1 style ids aren't reused here
-  // since Rooms are a distinct source from Station nodes).
-  const ROOM_LEVEL_INPUTS = [
-    ["room-forge-level", "forgeLevel", "speed", 60],
-    ["room-workshop-level", "workshopLevel", "speed", 60],
-    ["room-underforge-level", "underforgeLevel", "ingredient", 11],
-    ["room-dorm-level", "dormLevel", "ingredient", 11],
+  // Every Station tech-node category, generated into #station-grid by
+  // renderStationGrid below. "value" is the Items & Alloys ladder (boosts
+  // alloy/item sell value) — it changes price only, like Sales/Marketing
+  // above, unlike Smelting/Crafting which change the stat tables' effective
+  // smelt/craft time.
+  const STATION_CATEGORIES = [
+    { prefix: "smelting", label: "Smelting", maxLevels: [5, 10, 15, 20, 20] },
+    { prefix: "crafting", label: "Crafting", maxLevels: [5, 10, 15, 20, 20] },
+    { prefix: "value", label: "Value", maxLevels: [5, 5, 5, 4, 4, 2, 2], priceOnly: true },
   ];
 
   // Formats a Room level's computed multiplier for its hint span, e.g. "2.10x".
   function roomMultiplierHint(kind, level) {
-    const mult = kind === "speed" ? F().roomSpeedMultiplier(level) : F().roomIngredientMultiplier(level);
-    return Number(mult.toFixed(2)) + "x";
+    return Number(F().roomMultiplier(kind, level).toFixed(2)) + "x";
   }
 
   // Formats one Station node's own bonus for its hint span, e.g. "+5%".
-  function stationNodeHint(index, level) {
-    const pct = Math.round(F().stationNodeBonus(index, level) * 100);
+  function stationNodeHint(category, index, level) {
+    const pct = Math.round(F().stationNodeBonus(category, index, level) * 100);
     return `+${pct}%`;
   }
 
-  // Formats a Station category's (Smelting/Crafting) combined multiplier
-  // across its 5 nodes, e.g. "2.50x". Nodes stack additively within a
-  // category (see stationCategoryMultiplier in model.js).
+  // Formats a Station category's combined multiplier across its nodes, e.g.
+  // "2.50x". Nodes stack additively within a category (see
+  // stationCategoryMultiplier in model.js).
   function stationCategoryHint(prefix) {
-    const levels = [1, 2, 3, 4, 5].map((n) => state.controls[`${prefix}${n}`]);
-    return Number(F().stationCategoryMultiplier(levels).toFixed(2)) + "x";
+    const cat = STATION_CATEGORIES.find((c) => c.prefix === prefix);
+    const levels = cat.maxLevels.map((_, i) => state.controls[`${prefix}${i + 1}`]);
+    return Number(F().stationCategoryMultiplier(prefix, levels).toFixed(2)) + "x";
   }
 
-  function updateStationCategoryHint(prefix) {
-    document.getElementById(`station-${prefix}-total-hint`).textContent = stationCategoryHint(prefix);
+  // Rebuilds #rooms-grid from ROOMS/state.controls. Full-rebuild-on-change,
+  // the same convention as renderManagersList/renderModuleEffectsList below,
+  // so initControls and syncControlsUI (post-import) share one code path.
+  function renderRoomsGrid() {
+    const container = document.getElementById("rooms-grid");
+    container.innerHTML = "";
+    for (const room of ROOMS) {
+      const row = document.createElement("div");
+      row.className = "room-row";
+
+      const label = document.createElement("span");
+      label.className = "room-label";
+      label.textContent = room.label;
+
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.max = String(room.max);
+      input.step = "1";
+      input.value = String(state.controls[room.key]);
+      input.setAttribute("aria-label", `${room.label} level`);
+
+      const hint = document.createElement("span");
+      hint.className = "control-hint room-hint";
+      hint.textContent = roomMultiplierHint(room.kind, state.controls[room.key]);
+
+      const effect = document.createElement("span");
+      effect.className = "room-effect";
+      effect.textContent = room.effect;
+
+      input.addEventListener("input", () => {
+        const raw = input.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 0 && n <= room.max;
+        input.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        state.controls[room.key] = n;
+        hint.textContent = roomMultiplierHint(room.kind, n);
+        saveState();
+        updateGroupSummary("rooms");
+        if (room.priceOnly) {
+          refreshEffectivePrices();
+          renderChart();
+        } else {
+          // Forge/Workshop/Underforge/Dorm change the stat tables' effective
+          // smelt/craft time or ingredient amount, not just price.
+          renderAll();
+        }
+      });
+
+      row.append(label, input, hint, effect);
+      container.appendChild(row);
+    }
+  }
+
+  // Rebuilds #station-grid from STATION_CATEGORIES/state.controls. Same
+  // full-rebuild convention as renderRoomsGrid above.
+  function renderStationGrid() {
+    const container = document.getElementById("station-grid");
+    container.innerHTML = "";
+    for (const cat of STATION_CATEGORIES) {
+      const group = document.createElement("div");
+      group.className = "station-category";
+
+      const head = document.createElement("div");
+      head.className = "station-category-head";
+      const name = document.createElement("span");
+      name.className = "station-name";
+      name.textContent = cat.label;
+      const total = document.createElement("span");
+      total.className = "control-hint";
+      total.textContent = stationCategoryHint(cat.prefix);
+      head.append(name, total);
+
+      const nodes = document.createElement("div");
+      nodes.className = "station-nodes";
+      nodes.style.setProperty("--node-count", String(cat.maxLevels.length));
+
+      cat.maxLevels.forEach((max, i) => {
+        const key = `${cat.prefix}${i + 1}`;
+        const node = document.createElement("div");
+        node.className = "station-node";
+
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.max = String(max);
+        input.step = "1";
+        input.value = String(state.controls[key]);
+        input.setAttribute("aria-label", `${cat.label} node ${i + 1} level`);
+
+        const hint = document.createElement("span");
+        hint.className = "control-hint";
+        hint.textContent = stationNodeHint(cat.prefix, i, state.controls[key]);
+
+        input.addEventListener("input", () => {
+          const raw = input.value.trim();
+          const n = Number(raw);
+          const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 0 && n <= max;
+          input.classList.toggle("invalid", !ok);
+          if (!ok) return;
+          state.controls[key] = n;
+          hint.textContent = stationNodeHint(cat.prefix, i, n);
+          total.textContent = stationCategoryHint(cat.prefix);
+          saveState();
+          updateGroupSummary("station");
+          if (cat.priceOnly) {
+            refreshEffectivePrices();
+            renderChart();
+          } else {
+            // Smelting/Crafting change the stat tables' effective smelt/
+            // craft time, not just price.
+            renderAll();
+          }
+        });
+
+        node.append(input, hint);
+        nodes.appendChild(node);
+      });
+
+      group.append(head, nodes);
+      container.appendChild(group);
+    }
+  }
+
+  // ---- disclosure groups & their live summaries ----------------------
+
+  // <details> id (minus the "group-" prefix) <-> what its <summary> reports
+  // while collapsed, so the whole setup is readable without opening
+  // anything. Recomputed after any change that could affect the text.
+  function groupSummaryText(key) {
+    switch (key) {
+      case "tech": {
+        const n = TECH_TOGGLES.filter(([, k]) => state.controls[k]).length;
+        return `${n} of ${TECH_TOGGLES.length} researched`;
+      }
+      case "rooms": {
+        const bought = ROOMS.filter((r) => state.controls[r.key] > 0);
+        return bought.length ? bought.map((r) => `${r.label} ${state.controls[r.key]}`).join(" · ") : "Not purchased";
+      }
+      case "station":
+        return STATION_CATEGORIES.map((c) => `${c.label.toLowerCase()} ${stationCategoryHint(c.prefix)}`).join(" · ");
+      case "managers": {
+        const n = state.controls.managers.length;
+        return n === 0 ? "None" : `${n} manager${n === 1 ? "" : "s"}`;
+      }
+      case "modules": {
+        const n = state.controls.moduleEffects.length;
+        return n === 0 ? "None" : `${n} effect${n === 1 ? "" : "s"}`;
+      }
+      case "ores":
+      case "alloys":
+      case "items": {
+        const cat = key === "ores" ? "ore" : key === "alloys" ? "alloy" : "item";
+        const all = DEFAULT_ENTITIES.filter((e) => e.category === cat);
+        const unlocked = all.filter((e) => isUnlocked(e.id)).length;
+        return `${unlocked} of ${all.length} unlocked`;
+      }
+      default:
+        return "";
+    }
+  }
+
+  function updateGroupSummary(key) {
+    const el = document.getElementById(`summary-${key}`);
+    if (el) el.textContent = groupSummaryText(key);
+  }
+
+  function updateAllGroupSummaries() {
+    for (const key of Object.keys(state.controls.open)) updateGroupSummary(key);
+  }
+
+  // Wires each <details> group's open/closed state to state.controls.open
+  // (view state only — never affects the model) and seeds its summary text.
+  function initDisclosures() {
+    for (const key of Object.keys(state.controls.open)) {
+      const details = document.getElementById(`group-${key}`);
+      if (!details) continue;
+      details.open = state.controls.open[key];
+      details.addEventListener("toggle", () => {
+        state.controls.open[key] = details.open;
+        saveState();
+      });
+    }
+    updateAllGroupSummaries();
   }
 
   // ---- controls ----------------------------------------------------
@@ -1090,6 +1355,7 @@
         state.controls.managers = state.controls.managers.filter((x) => x.id !== m.id);
         saveState();
         renderManagersList();
+        updateGroupSummary("managers");
         renderAll();
       });
 
@@ -1182,6 +1448,7 @@
         state.controls.moduleEffects = state.controls.moduleEffects.filter((x) => x.id !== e.id);
         saveState();
         renderModuleEffectsList();
+        updateGroupSummary("modules");
         renderAll();
       });
 
@@ -1214,64 +1481,8 @@
       });
     }
 
-    for (const [inputId, key] of BONUS_INPUTS) {
-      const input = document.getElementById(inputId);
-      input.value = String(state.controls[key]);
-      input.addEventListener("input", () => {
-        const raw = input.value.trim();
-        const n = Number(raw);
-        const ok = raw !== "" && isFinite(n) && n > 0;
-        input.classList.toggle("invalid", !ok);
-        if (!ok) return;
-        state.controls[key] = n;
-        saveState();
-        refreshEffectivePrices();
-        renderChart();
-      });
-    }
-
-    for (const [inputId, key, index, max] of SPEED_STATION_INPUTS) {
-      const input = document.getElementById(inputId);
-      const hint = document.getElementById(`${inputId}-hint`);
-      const prefix = key.replace(/\d+$/, "");
-      input.value = String(state.controls[key]);
-      hint.textContent = stationNodeHint(index, state.controls[key]);
-      input.addEventListener("input", () => {
-        const raw = input.value.trim();
-        const n = Number(raw);
-        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 0 && n <= max;
-        input.classList.toggle("invalid", !ok);
-        if (!ok) return;
-        state.controls[key] = n;
-        hint.textContent = stationNodeHint(index, n);
-        updateStationCategoryHint(prefix);
-        saveState();
-        // Station nodes change the stat table's effective smelt/craft time,
-        // not just price, so this needs the full re-render (like TECH_TOGGLES).
-        renderAll();
-      });
-    }
-    for (const prefix of STATION_CATEGORY_PREFIXES) updateStationCategoryHint(prefix);
-
-    for (const [inputId, key, kind, max] of ROOM_LEVEL_INPUTS) {
-      const input = document.getElementById(inputId);
-      const hint = document.getElementById(inputId.replace("-level", "-hint"));
-      input.value = String(state.controls[key]);
-      hint.textContent = roomMultiplierHint(kind, state.controls[key]);
-      input.addEventListener("input", () => {
-        const raw = input.value.trim();
-        const n = Number(raw);
-        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 0 && n <= max;
-        input.classList.toggle("invalid", !ok);
-        if (!ok) return;
-        state.controls[key] = n;
-        hint.textContent = roomMultiplierHint(kind, n);
-        saveState();
-        // Rooms change the stat table's effective smelt/craft time or
-        // ingredient cost, not just price, so this needs the full re-render.
-        renderAll();
-      });
-    }
+    renderRoomsGrid();
+    renderStationGrid();
 
     document.getElementById("add-manager-btn").addEventListener("click", () => {
       state.controls.managers.push({
@@ -1282,6 +1493,7 @@
       });
       saveState();
       renderManagersList();
+      updateGroupSummary("managers");
     });
     renderManagersList();
 
@@ -1294,6 +1506,7 @@
       });
       saveState();
       renderModuleEffectsList();
+      updateGroupSummary("modules");
     });
     renderModuleEffectsList();
 
@@ -1314,6 +1527,8 @@
       const file = importInput.files[0];
       if (file) importData(file);
     });
+
+    initDisclosures();
   }
 
   const importStatus = () => document.getElementById("import-status");
@@ -1382,23 +1597,15 @@
     for (const [checkboxId, key] of TECH_TOGGLES) {
       document.getElementById(checkboxId).checked = state.controls[key];
     }
-    for (const [inputId, key] of BONUS_INPUTS) {
-      document.getElementById(inputId).value = String(state.controls[key]);
-    }
-    for (const [inputId, key, index] of SPEED_STATION_INPUTS) {
-      document.getElementById(inputId).value = String(state.controls[key]);
-      document.getElementById(`${inputId}-hint`).textContent = stationNodeHint(index, state.controls[key]);
-    }
-    for (const prefix of STATION_CATEGORY_PREFIXES) updateStationCategoryHint(prefix);
-    for (const [inputId, key, kind] of ROOM_LEVEL_INPUTS) {
-      document.getElementById(inputId).value = String(state.controls[key]);
-      document.getElementById(inputId.replace("-level", "-hint")).textContent = roomMultiplierHint(
-        kind,
-        state.controls[key]
-      );
-    }
+    renderRoomsGrid();
+    renderStationGrid();
     renderManagersList();
     renderModuleEffectsList();
+    for (const key of Object.keys(state.controls.open)) {
+      const details = document.getElementById(`group-${key}`);
+      if (details) details.open = state.controls.open[key];
+    }
+    updateAllGroupSummaries();
   }
 
   function segmented(containerId, controlKey) {
@@ -1419,6 +1626,7 @@
   function renderAll() {
     renderChart();
     renderStatTables();
+    updateAllGroupSummaries();
   }
 
   renderLegend();

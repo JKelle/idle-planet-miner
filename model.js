@@ -40,14 +40,14 @@ function moduleEffectMultiplier(controls, category) {
 }
 
 // Multiplicative decomposition of a sellable's price, mirroring profit.py's
-// get_sell_price. Ores get no sales-room, station-value, or value-project
+// get_sell_price. Ores get no station-value, sales-room, or value-project
 // bonus — those are alloy/item-only in-game. Module-value bonuses can still
 // target ores though (e.g. the Multiweave Hub's value sub-effect), so
 // moduleValue is computed for every category, including ore. Alloys and
-// items share a single station-value control since they always move
-// together in-game. The Marketing room scales positive market boosts only
-// (a x3 market at Marketing 2.50 sells for x7.5); a glut market (< 1) is
-// never scaled.
+// items share a single station-value ladder since they always move together
+// in-game ("Items & Alloys" is one category on the Station tree). The
+// Marketing room scales positive market boosts only (a x3 market at
+// Marketing level 21 sells for higher); a glut market (< 1) is never scaled.
 function sellPriceParts(entity, controls) {
   const base = entity.basePrice;
   const star = 1 + 0.2 * entity.stars;
@@ -60,9 +60,19 @@ function sellPriceParts(entity, controls) {
     ? Math.pow(1.2, on("techAdvancedAlloyValue") + on("techSuperiorAlloyValue"))
     : Math.pow(1.2, on("techAdvancedItemValue") + on("techSuperiorItemValue"));
 
-  const station = isOre ? 1 : controls.station;
+  const station = isOre
+    ? 1
+    : stationCategoryMultiplier("value", [
+        controls.value1,
+        controls.value2,
+        controls.value3,
+        controls.value4,
+        controls.value5,
+        controls.value6,
+        controls.value7,
+      ]);
 
-  const sales = isOre ? 1 : controls.salesRoom;
+  const sales = isOre ? 1 : roomMultiplier("sales", controls.salesRoomLevel);
 
   const moduleValue = moduleEffectMultiplier(
     controls,
@@ -70,7 +80,8 @@ function sellPriceParts(entity, controls) {
   );
 
   const rawMarket = typeof entity.market === "number" ? entity.market : 1;
-  const market = rawMarket > 1 ? rawMarket * controls.marketingRoom : rawMarket;
+  const marketingMult = roomMultiplier("marketing", controls.marketingRoomLevel);
+  const market = rawMarket > 1 ? rawMarket * marketingMult : rawMarket;
 
   const effective = base * star * tech * station * sales * moduleValue * market;
   return { base, star, tech, station, sales, moduleValue, market, effective };
@@ -118,49 +129,76 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Forge/Workshop room level -> smelt/craft speed multiplier. Level 0 = not
-// purchased (identity). From the wiki's Rooms page: base x1.20 at level 1,
-// +0.10 per additional level, capping at level 60 (x7.10). Verified against
-// a real level-10 Forge: 1.20 + 0.10*9 = 2.10x.
-function roomSpeedMultiplier(level) {
-  const lvl = Math.max(0, Math.min(60, Math.floor(level) || 0));
-  return lvl === 0 ? 1 : 1.2 + 0.1 * (lvl - 1);
+// Mothership Room level -> multiplier, level 0 = not purchased (identity).
+// Every Room follows the same shape (base at level 1, +per per additional
+// level, capping at max) with different constants per kind. From the wiki's
+// Rooms page:
+//   speed      (Forge/Workshop):     base x1.20, +0.10/lvl, max 60 (x7.10)
+//   ingredient (Underforge/Dorm):    base x0.90, -0.04/lvl, max 11 (x50%)
+//   sales      (Sales):              base x1.15, +0.05/lvl, max 60 (x4.10)
+//   marketing  (Marketing):          base x1.30, +0.10/lvl, max 60 (x7.20)
+// Verified against a real level-10 Forge: 1.20 + 0.10*9 = 2.10x.
+const ROOM_KINDS = {
+  speed: { base: 1.2, per: 0.1, max: 60 },
+  ingredient: { base: 0.9, per: -0.04, max: 11 },
+  sales: { base: 1.15, per: 0.05, max: 60 },
+  marketing: { base: 1.3, per: 0.1, max: 60 },
+};
+
+function roomMultiplier(kind, level) {
+  const { base, per, max } = ROOM_KINDS[kind];
+  const lvl = Math.max(0, Math.min(max, Math.floor(level) || 0));
+  return lvl === 0 ? 1 : base + per * (lvl - 1);
 }
 
-// Underforge/Dorm room level -> ingredient-amount multiplier (a reduction,
-// always <= 1). Level 0 = not purchased (identity). From the wiki: x90% at
-// level 1, -4% per additional level, capping at level 11 (x50%).
-function roomIngredientMultiplier(level) {
-  const lvl = Math.max(0, Math.min(11, Math.floor(level) || 0));
-  return lvl === 0 ? 1 : 0.9 - 0.04 * (lvl - 1);
-}
-
-// Station "Smelting"/"Crafting" tech-node ladder: [maxLevel, bonusPerLevel]
-// for node 1..5. From the game-data spreadsheet's Bonus/lvl row (IPM -
-// Subspace Station Costs, gid=0).
-const STATION_NODES = [
-  [5, 0.01],
-  [10, 0.01],
-  [15, 0.01],
-  [20, 0.02],
-  [20, 0.04],
-];
+// Station tech-node ladders: [maxLevel, bonusPerLevel] per node, keyed by
+// category. From the game-data spreadsheet's Bonus/lvl row (IPM - Subspace
+// Station Costs, gid=0). Smelting/Crafting have 5 nodes each (Category Bonus
+// 2.50); Items & Alloys ("value") has 7 nodes (Category Bonus 2.44) — it
+// boosts alloy/item sell value the same way Smelting/Crafting boost speed.
+const STATION_LADDERS = {
+  smelting: [
+    [5, 0.01],
+    [10, 0.01],
+    [15, 0.01],
+    [20, 0.02],
+    [20, 0.04],
+  ],
+  crafting: [
+    [5, 0.01],
+    [10, 0.01],
+    [15, 0.01],
+    [20, 0.02],
+    [20, 0.04],
+  ],
+  value: [
+    [5, 0.036],
+    [5, 0.08],
+    [5, 0.08],
+    [4, 0.02],
+    [4, 0.02],
+    [2, 0.075],
+    [2, 0.075],
+  ],
+};
 
 // One station node's own bonus contribution at a given level (0 at level 0).
-function stationNodeBonus(index, level) {
-  const [max, perLevel] = STATION_NODES[index];
+function stationNodeBonus(category, index, level) {
+  const [max, perLevel] = STATION_LADDERS[category][index];
   const lvl = Math.max(0, Math.min(max, Math.floor(level) || 0));
   return lvl * perLevel;
 }
 
-// Five node levels -> the category's combined multiplier. Nodes stack
+// A category's node levels -> its combined multiplier. Nodes stack
 // ADDITIVELY within a category (the sheet's Category Bonus of 2.50 at max
-// levels = 1 + 0.05+0.10+0.15+0.40+0.80, not the product of the per-node
-// totals), unlike every other source in techMultipliers, which multiply.
-function stationCategoryMultiplier(levels) {
+// smelting/crafting levels = 1 + 0.05+0.10+0.15+0.40+0.80, not the product of
+// the per-node totals), unlike every other source in techMultipliers, which
+// multiply.
+function stationCategoryMultiplier(category, levels) {
   let bonus = 0;
-  for (let i = 0; i < STATION_NODES.length; i++) {
-    bonus += stationNodeBonus(i, levels[i]);
+  const ladder = STATION_LADDERS[category];
+  for (let i = 0; i < ladder.length; i++) {
+    bonus += stationNodeBonus(category, i, levels[i]);
   }
   return 1 + bonus;
 }
@@ -189,14 +227,14 @@ function techMultipliers(controls) {
   const on = (k) => (controls && controls[k] ? 1 : 0);
   const level = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 0);
 
-  const stationSmeltMult = stationCategoryMultiplier([
+  const stationSmeltMult = stationCategoryMultiplier("smelting", [
     level("smelting1"),
     level("smelting2"),
     level("smelting3"),
     level("smelting4"),
     level("smelting5"),
   ]);
-  const stationCraftMult = stationCategoryMultiplier([
+  const stationCraftMult = stationCategoryMultiplier("crafting", [
     level("crafting1"),
     level("crafting2"),
     level("crafting3"),
@@ -204,10 +242,10 @@ function techMultipliers(controls) {
     level("crafting5"),
   ]);
 
-  const forgeMult = roomSpeedMultiplier(level("forgeLevel"));
-  const workshopMult = roomSpeedMultiplier(level("workshopLevel"));
-  const underforgeMult = roomIngredientMultiplier(level("underforgeLevel"));
-  const dormMult = roomIngredientMultiplier(level("dormLevel"));
+  const forgeMult = roomMultiplier("speed", level("forgeLevel"));
+  const workshopMult = roomMultiplier("speed", level("workshopLevel"));
+  const underforgeMult = roomMultiplier("ingredient", level("underforgeLevel"));
+  const dormMult = roomMultiplier("ingredient", level("dormLevel"));
 
   const managers = controls && Array.isArray(controls.managers) ? controls.managers : [];
   let managerSmeltMult = 1;
@@ -379,8 +417,7 @@ if (typeof module !== "undefined" && module.exports) {
     profitPerSecond,
     newMemos,
     techMultipliers,
-    roomSpeedMultiplier,
-    roomIngredientMultiplier,
+    roomMultiplier,
     stationNodeBonus,
     stationCategoryMultiplier,
     moduleEffectMultiplier,

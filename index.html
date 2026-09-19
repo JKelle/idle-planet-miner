@@ -9,257 +9,59 @@
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
   <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
   <header class="site-header">
-    <h1>Profitability Explorer</h1>
-    <p class="tagline">
-      Edit your in-game stats and see which alloy or item is most profitable to
-      smelt or craft, per second. The numbers below are one player's save —
-      edit the stars, market rolls, bonuses, and unlock toggles in the Stats
-      section to match your own game.
-    </p>
+    <div class="site-header-row">
+      <div>
+        <h1>Profitability Explorer</h1>
+        <p class="tagline">
+          Edit your in-game stats and see which alloy or item is most
+          profitable to smelt or craft, per second.
+        </p>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="export-data" class="btn-secondary">Export my data</button>
+        <button type="button" id="import-data" class="btn-secondary">Import data</button>
+        <button type="button" id="reset-all" class="btn-secondary">Reset all to defaults</button>
+        <input type="file" id="import-file" accept="application/json" hidden />
+      </div>
+    </div>
+    <span id="import-status" class="import-status" aria-live="polite"></span>
   </header>
 
   <main>
-    <section class="card controls-card" aria-label="Chart controls">
-      <div class="control-group" role="group" aria-label="Axis scale">
-        <span class="control-label">Axis scale</span>
-        <div class="segmented" id="scale-control">
-          <button type="button" data-value="linear" class="active">Linear</button>
-          <button type="button" data-value="logarithmic">Log</button>
+    <section class="chart-panel" aria-label="Profit per second chart">
+      <div class="chart-toolbar">
+        <div class="control-group" role="group" aria-label="Axis scale">
+          <span class="control-label">Axis scale</span>
+          <div class="segmented" id="scale-control">
+            <button type="button" data-value="linear" class="active">Linear</button>
+            <button type="button" data-value="logarithmic">Log</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="sort-control">Sort by</label>
+          <select id="sort-control">
+            <option value="profit-desc">Profit / sec — high to low</option>
+            <option value="profit-asc">Profit / sec — low to high</option>
+            <option value="name-asc">Name — A to Z</option>
+            <option value="name-desc">Name — Z to A</option>
+          </select>
+        </div>
+
+        <div class="control-group" role="group" aria-label="Category filter">
+          <span class="control-label">Show</span>
+          <div class="segmented" id="category-control">
+            <button type="button" data-value="all" class="active">All</button>
+            <button type="button" data-value="alloy">Alloys</button>
+            <button type="button" data-value="item">Items</button>
+          </div>
         </div>
       </div>
 
-      <div class="control-group">
-        <label class="control-label" for="sort-control">Sort by</label>
-        <select id="sort-control">
-          <option value="profit-desc">Profit / sec — high to low</option>
-          <option value="profit-asc">Profit / sec — low to high</option>
-          <option value="name-asc">Name — A to Z</option>
-          <option value="name-desc">Name — Z to A</option>
-        </select>
-      </div>
-
-      <div class="control-group" role="group" aria-label="Category filter">
-        <span class="control-label">Show</span>
-        <div class="segmented" id="category-control">
-          <button type="button" data-value="all" class="active">All</button>
-          <button type="button" data-value="alloy">Alloys</button>
-          <button type="button" data-value="item">Items</button>
-        </div>
-      </div>
-
-      <div class="controls-actions">
-        <button type="button" id="reset-all" class="btn-secondary">
-          Reset all to defaults
-        </button>
-        <button type="button" id="export-data" class="btn-secondary">
-          Export my data
-        </button>
-        <button type="button" id="import-data" class="btn-secondary">
-          Import data
-        </button>
-        <input type="file" id="import-file" accept="application/json" hidden />
-        <span id="import-status" class="import-status" aria-live="polite"></span>
-      </div>
-    </section>
-
-    <section class="card techs-card" aria-label="Researched tech">
-      <h2>Researched tech</h2>
-      <p class="card-sub">
-        Tick a tech to see what researching it would do to alloy/item sell
-        prices, smelt times, and ingredient costs. Base prices never include
-        these bonuses, so a toggle simply means "I've researched this".
-      </p>
-      <div class="techs-list">
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-advanced-furnace" />
-          <img class="entity-icon" src="assets/icons/tech-advanced-furnace.webp" alt="" />
-          Advanced Furnace — all smelters ×1.2 speed
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-superior-furnace" />
-          <img class="entity-icon" src="assets/icons/tech-superior-furnace.webp" alt="" />
-          Superior Furnace — all smelters ×1.2 speed
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-smelting-efficiency" />
-          <img class="entity-icon" src="assets/icons/tech-smelting-efficiency.webp" alt="" />
-          Smelting Efficiency — all smelter ingredients −20%
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-advanced-alloy-value" />
-          <img class="entity-icon" src="assets/icons/tech-advanced-alloy-value.webp" alt="" />
-          Advanced Alloy Value — all alloy values ×1.2
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-superior-alloy-value" />
-          <img class="entity-icon" src="assets/icons/tech-superior-alloy-value.webp" alt="" />
-          Superior Alloy Value — all alloy values ×1.2
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-advanced-crafting" />
-          <img class="entity-icon" src="assets/icons/tech-advanced-crafting.webp" alt="" />
-          Advanced Crafting — all crafting stations ×1.2 speed
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-superior-crafting" />
-          <img class="entity-icon" src="assets/icons/tech-superior-crafting.webp" alt="" />
-          Superior Crafting — all crafting stations ×1.2 speed
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-crafting-efficiency" />
-          <img class="entity-icon" src="assets/icons/tech-crafting-efficiency.webp" alt="" />
-          Crafting Efficiency — all crafting station ingredients −20%
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-advanced-item-value" />
-          <img class="entity-icon" src="assets/icons/tech-advanced-item-value.webp" alt="" />
-          Advanced Item Value — all item values ×1.2
-        </label>
-        <label class="tech-toggle">
-          <input type="checkbox" id="tech-superior-item-value" />
-          <img class="entity-icon" src="assets/icons/tech-superior-item-value.webp" alt="" />
-          Superior Item Value — all item values ×1.2
-        </label>
-      </div>
-    </section>
-
-    <section class="card speed-card" aria-label="Smelt/craft speed & ingredient bonuses">
-      <h2>Smelt/craft speed & ingredient bonuses</h2>
-      <p class="card-sub">
-        Mothership Rooms, Station tech nodes, Managers, and Module effects
-        that boost smelter/crafter speed, reduce ingredient costs, or (for
-        Module effects) boost alloy/item sell value, on top of the
-        Researched tech above. Enter the level you've purchased for each
-        Room/Station node (0 = not purchased); the hint next to it shows the
-        resulting bonus.
-      </p>
-
-      <h3>Rooms</h3>
-      <div class="bonus-grid">
-        <div class="control-group">
-          <label class="control-label" for="room-forge-level">Forge level</label>
-          <input type="number" id="room-forge-level" min="0" max="60" step="1" />
-          <span class="control-hint" id="room-forge-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="room-workshop-level">Workshop level</label>
-          <input type="number" id="room-workshop-level" min="0" max="60" step="1" />
-          <span class="control-hint" id="room-workshop-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="room-underforge-level">Underforge level</label>
-          <input type="number" id="room-underforge-level" min="0" max="11" step="1" />
-          <span class="control-hint" id="room-underforge-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="room-dorm-level">Dorm level</label>
-          <input type="number" id="room-dorm-level" min="0" max="11" step="1" />
-          <span class="control-hint" id="room-dorm-hint"></span>
-        </div>
-      </div>
-
-      <h3>Station nodes</h3>
-      <p class="card-sub">
-        Smelting total: <span class="control-hint" id="station-smelting-total-hint"></span>
-        &nbsp;·&nbsp; Crafting total: <span class="control-hint" id="station-crafting-total-hint"></span>
-      </p>
-      <div class="bonus-grid">
-        <div class="control-group">
-          <label class="control-label" for="bonus-smelting-1">Smelting 1 level</label>
-          <input type="number" id="bonus-smelting-1" min="0" max="5" step="1" />
-          <span class="control-hint" id="bonus-smelting-1-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-smelting-2">Smelting 2 level</label>
-          <input type="number" id="bonus-smelting-2" min="0" max="10" step="1" />
-          <span class="control-hint" id="bonus-smelting-2-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-smelting-3">Smelting 3 level</label>
-          <input type="number" id="bonus-smelting-3" min="0" max="15" step="1" />
-          <span class="control-hint" id="bonus-smelting-3-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-smelting-4">Smelting 4 level</label>
-          <input type="number" id="bonus-smelting-4" min="0" max="20" step="1" />
-          <span class="control-hint" id="bonus-smelting-4-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-smelting-5">Smelting 5 level</label>
-          <input type="number" id="bonus-smelting-5" min="0" max="20" step="1" />
-          <span class="control-hint" id="bonus-smelting-5-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-crafting-1">Crafting 1 level</label>
-          <input type="number" id="bonus-crafting-1" min="0" max="5" step="1" />
-          <span class="control-hint" id="bonus-crafting-1-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-crafting-2">Crafting 2 level</label>
-          <input type="number" id="bonus-crafting-2" min="0" max="10" step="1" />
-          <span class="control-hint" id="bonus-crafting-2-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-crafting-3">Crafting 3 level</label>
-          <input type="number" id="bonus-crafting-3" min="0" max="15" step="1" />
-          <span class="control-hint" id="bonus-crafting-3-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-crafting-4">Crafting 4 level</label>
-          <input type="number" id="bonus-crafting-4" min="0" max="20" step="1" />
-          <span class="control-hint" id="bonus-crafting-4-hint"></span>
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-crafting-5">Crafting 5 level</label>
-          <input type="number" id="bonus-crafting-5" min="0" max="20" step="1" />
-          <span class="control-hint" id="bonus-crafting-5-hint"></span>
-        </div>
-      </div>
-
-      <h3>Managers</h3>
-      <div id="managers-list"></div>
-      <button type="button" id="add-manager-btn" class="btn-secondary">+ Add manager</button>
-
-      <h3>Modules</h3>
-      <p class="card-sub">
-        Modules have no fixed level formula (main effects scale
-        unpredictably; sub-effects are randomly rolled), so enter each
-        effect's current value directly. An effect that boosts more than one
-        category (e.g. a module's main effect often boosts both smelt and
-        craft speed) needs one row per category.
-      </p>
-      <div id="module-effects-list"></div>
-      <button type="button" id="add-module-effect-btn" class="btn-secondary">+ Add module effect</button>
-    </section>
-
-    <section class="card bonuses-card" aria-label="Sell price bonuses">
-      <h2>Sell price bonuses</h2>
-      <p class="card-sub">
-        These stack multiplicatively with base price, stars, and researched
-        tech to make each entity's effective sell price.
-      </p>
-      <div class="bonus-grid">
-        <div class="control-group">
-          <label class="control-label" for="bonus-sales-room">Sales room (alloys &amp; items)</label>
-          <input type="number" id="bonus-sales-room" min="0" step="any" />
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-station">Station value (alloys &amp; items)</label>
-          <input type="number" id="bonus-station" min="0" step="any" />
-        </div>
-        <div class="control-group">
-          <label class="control-label" for="bonus-marketing-room">Marketing room</label>
-          <input type="number" id="bonus-marketing-room" min="0" step="any" />
-          <span class="control-hint">Scales positive market boosts only</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="card chart-card" aria-label="Profit per second chart">
       <div class="chart-legend" id="chart-legend"></div>
       <div class="chart-scroll">
         <div class="chart-canvas-wrap" id="chart-canvas-wrap">
@@ -269,7 +71,127 @@
       <p class="chart-note" id="chart-note" aria-live="polite"></p>
     </section>
 
-    <section class="card stats-card" aria-label="Stats">
+    <section class="setup" aria-label="Your game">
+      <h2>Your game</h2>
+
+      <details class="group" id="group-tech">
+        <summary>
+          <span class="group-title">Researched tech</span>
+          <span class="group-summary" id="summary-tech"></span>
+        </summary>
+        <p class="card-sub">
+          Tick a tech to see what researching it would do to alloy/item sell
+          prices, smelt times, and ingredient costs. Base prices never
+          include these bonuses, so a toggle simply means "I've researched
+          this".
+        </p>
+        <div class="techs-list">
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-advanced-furnace" />
+            <img class="entity-icon" src="assets/icons/tech-advanced-furnace.webp" alt="" />
+            Advanced Furnace — all smelters ×1.2 speed
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-superior-furnace" />
+            <img class="entity-icon" src="assets/icons/tech-superior-furnace.webp" alt="" />
+            Superior Furnace — all smelters ×1.2 speed
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-smelting-efficiency" />
+            <img class="entity-icon" src="assets/icons/tech-smelting-efficiency.webp" alt="" />
+            Smelting Efficiency — all smelter ingredients −20%
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-advanced-alloy-value" />
+            <img class="entity-icon" src="assets/icons/tech-advanced-alloy-value.webp" alt="" />
+            Advanced Alloy Value — all alloy values ×1.2
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-superior-alloy-value" />
+            <img class="entity-icon" src="assets/icons/tech-superior-alloy-value.webp" alt="" />
+            Superior Alloy Value — all alloy values ×1.2
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-advanced-crafting" />
+            <img class="entity-icon" src="assets/icons/tech-advanced-crafting.webp" alt="" />
+            Advanced Crafting — all crafting stations ×1.2 speed
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-superior-crafting" />
+            <img class="entity-icon" src="assets/icons/tech-superior-crafting.webp" alt="" />
+            Superior Crafting — all crafting stations ×1.2 speed
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-crafting-efficiency" />
+            <img class="entity-icon" src="assets/icons/tech-crafting-efficiency.webp" alt="" />
+            Crafting Efficiency — all crafting station ingredients −20%
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-advanced-item-value" />
+            <img class="entity-icon" src="assets/icons/tech-advanced-item-value.webp" alt="" />
+            Advanced Item Value — all item values ×1.2
+          </label>
+          <label class="tech-toggle">
+            <input type="checkbox" id="tech-superior-item-value" />
+            <img class="entity-icon" src="assets/icons/tech-superior-item-value.webp" alt="" />
+            Superior Item Value — all item values ×1.2
+          </label>
+        </div>
+      </details>
+
+      <details class="group" id="group-rooms">
+        <summary>
+          <span class="group-title">Mothership rooms</span>
+          <span class="group-summary" id="summary-rooms"></span>
+        </summary>
+        <p class="card-sub">
+          Enter the level you've purchased for each room (0 = not
+          purchased); the multiplier next to it is the resulting bonus.
+        </p>
+        <div id="rooms-grid" class="rooms-grid"></div>
+      </details>
+
+      <details class="group" id="group-station">
+        <summary>
+          <span class="group-title">Station nodes</span>
+          <span class="group-summary" id="summary-station"></span>
+        </summary>
+        <p class="card-sub">
+          Subspace Station tech-node levels (0 = not purchased). Smelting and
+          Crafting boost smelt/craft speed; Value boosts alloy and item sell
+          price. Nodes in a category stack additively into the category
+          total shown next to its name.
+        </p>
+        <div id="station-grid" class="station-grid"></div>
+      </details>
+
+      <details class="group" id="group-managers">
+        <summary>
+          <span class="group-title">Managers</span>
+          <span class="group-summary" id="summary-managers"></span>
+        </summary>
+        <div id="managers-list"></div>
+        <button type="button" id="add-manager-btn" class="btn-secondary">+ Add manager</button>
+      </details>
+
+      <details class="group" id="group-modules">
+        <summary>
+          <span class="group-title">Modules</span>
+          <span class="group-summary" id="summary-modules"></span>
+        </summary>
+        <p class="card-sub">
+          Modules have no fixed level formula (main effects scale
+          unpredictably; sub-effects are randomly rolled), so enter each
+          effect's current value directly. An effect that boosts more than
+          one category (e.g. a module's main effect often boosts both smelt
+          and craft speed) needs one row per category.
+        </p>
+        <div id="module-effects-list"></div>
+        <button type="button" id="add-module-effect-btn" class="btn-secondary">+ Add module effect</button>
+      </details>
+    </section>
+
+    <section class="stats" aria-label="Stats">
       <h2>Stats</h2>
       <p class="card-sub">
         Edit stars, market roll, time, and ingredient amounts inline. Base
@@ -281,62 +203,77 @@
         it.
       </p>
 
-      <h3>Ores</h3>
-      <div class="table-scroll">
-        <table class="stat-table">
-          <thead>
-            <tr>
-              <th scope="col">On</th>
-              <th scope="col" class="col-name">Ore</th>
-              <th></th>
-              <th></th>
-              <th scope="col">Base price</th>
-              <th scope="col">Stars</th>
-              <th scope="col">Market</th>
-              <th scope="col">Sell price</th>
-            </tr>
-          </thead>
-          <tbody id="ore-tbody"></tbody>
-        </table>
-      </div>
+      <details class="group" id="group-ores">
+        <summary>
+          <span class="group-title">Ores</span>
+          <span class="group-summary" id="summary-ores"></span>
+        </summary>
+        <div class="table-scroll">
+          <table class="stat-table">
+            <thead>
+              <tr>
+                <th scope="col">On</th>
+                <th scope="col" class="col-name">Ore</th>
+                <th></th>
+                <th></th>
+                <th scope="col">Base price</th>
+                <th scope="col">Stars</th>
+                <th scope="col">Market</th>
+                <th scope="col">Sell price</th>
+              </tr>
+            </thead>
+            <tbody id="ore-tbody"></tbody>
+          </table>
+        </div>
+      </details>
 
-      <h3>Alloys</h3>
-      <div class="table-scroll">
-        <table class="stat-table">
-          <thead>
-            <tr>
-              <th scope="col">On</th>
-              <th scope="col" class="col-name">Alloy</th>
-              <th scope="col">Smelt time</th>
-              <th scope="col" class="col-ingredients">Ingredients</th>
-              <th scope="col">Base price</th>
-              <th scope="col">Stars</th>
-              <th scope="col">Market</th>
-              <th scope="col">Sell price</th>
-            </tr>
-          </thead>
-          <tbody id="alloy-tbody"></tbody>
-        </table>
-      </div>
+      <details class="group" id="group-alloys">
+        <summary>
+          <span class="group-title">Alloys</span>
+          <span class="group-summary" id="summary-alloys"></span>
+        </summary>
+        <div class="table-scroll">
+          <table class="stat-table">
+            <thead>
+              <tr>
+                <th scope="col">On</th>
+                <th scope="col" class="col-name">Alloy</th>
+                <th scope="col">Smelt time</th>
+                <th scope="col" class="col-ingredients">Ingredients</th>
+                <th scope="col">Base price</th>
+                <th scope="col">Stars</th>
+                <th scope="col">Market</th>
+                <th scope="col">Sell price</th>
+              </tr>
+            </thead>
+            <tbody id="alloy-tbody"></tbody>
+          </table>
+        </div>
+      </details>
 
-      <h3>Items</h3>
-      <div class="table-scroll">
-        <table class="stat-table">
-          <thead>
-            <tr>
-              <th scope="col">On</th>
-              <th scope="col" class="col-name">Item</th>
-              <th scope="col">Craft time</th>
-              <th scope="col" class="col-ingredients">Ingredients</th>
-              <th scope="col">Base price</th>
-              <th scope="col">Stars</th>
-              <th scope="col">Market</th>
-              <th scope="col">Sell price</th>
-            </tr>
-          </thead>
-          <tbody id="item-tbody"></tbody>
-        </table>
-      </div>
+      <details class="group" id="group-items">
+        <summary>
+          <span class="group-title">Items</span>
+          <span class="group-summary" id="summary-items"></span>
+        </summary>
+        <div class="table-scroll">
+          <table class="stat-table">
+            <thead>
+              <tr>
+                <th scope="col">On</th>
+                <th scope="col" class="col-name">Item</th>
+                <th scope="col">Craft time</th>
+                <th scope="col" class="col-ingredients">Ingredients</th>
+                <th scope="col">Base price</th>
+                <th scope="col">Stars</th>
+                <th scope="col">Market</th>
+                <th scope="col">Sell price</th>
+              </tr>
+            </thead>
+            <tbody id="item-tbody"></tbody>
+          </table>
+        </div>
+      </details>
     </section>
   </main>
 
@@ -345,7 +282,7 @@
        file's own caching, so a freshly-loaded page never runs stale JS/CSS
        against fresh markup. Bump v on any deploy touching these 4 files. -->
   <script src="data.js?v=3"></script>
-  <script src="model.js?v=7"></script>
-  <script src="app.js?v=8"></script>
+  <script src="model.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

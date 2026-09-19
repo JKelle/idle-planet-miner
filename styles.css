@@ -1,6 +1,9 @@
 :root {
+  /* Indigo/blue is spent in exactly one place: the chart's alloy/item bars,
+   * their legend swatches, and focus rings. Everything else (buttons,
+   * active toggles, open-group affordance) uses ink or a neutral tint, so
+   * "blue" only ever means one thing on the page. */
   --accent: #4f46e5;
-  --accent-weak: #eef2ff;
   --accent-alloy: #4f46e5;
   --accent-item: #93c5fd;
   --bg: #f5f6fa;
@@ -9,10 +12,20 @@
   --text-soft: #5b6178;
   --border: #e4e6ef;
   --danger: #c0362c;
+  --danger-bg: #fdf3f2;
   --radius: 12px;
+  --radius-lg: 16px;
   --shadow: 0 1px 2px rgba(18, 22, 45, 0.04), 0 6px 20px rgba(18, 22, 45, 0.06);
+
+  /* Four-step type scale (was eight ad-hoc rem values). */
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.5rem;
+
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
+  font-size: var(--fs-base);
 }
 
 * {
@@ -30,62 +43,167 @@ body {
   line-height: 1.5;
 }
 
+/* This page is mostly numbers (levels, multipliers, prices) — keep digits
+ * fixed-width everywhere so they line up in columns instead of jittering. */
+input,
+select,
+.control-hint,
+.group-summary,
+.stat-table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- header ---- */
 .site-header {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 40px 24px 8px;
+  padding: 32px 24px 0;
+}
+
+.site-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px 24px;
 }
 
 .site-header h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: var(--fs-lg);
   letter-spacing: -0.01em;
 }
 
 .tagline {
   margin: 6px 0 0;
   color: var(--text-soft);
-  max-width: 52ch;
+  max-width: 60ch;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.import-status {
+  display: block;
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
 }
 
 main {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 16px 24px 64px;
+  padding: 20px 24px 64px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.card {
+/* ---- shared surfaces ----
+ * The chart is the one elevated surface on the page (larger radius, the
+ * only shadow) — everything else is a flat bordered panel, so the chart
+ * reads as the primary thing without competing with six identical cards. */
+.chart-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setup,
+.stats {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 20px;
+  padding: 4px 20px;
 }
 
-.card h2 {
-  margin: 0 0 4px;
-  font-size: 1.05rem;
-}
-
-.card h3 {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-soft);
+.setup h2,
+.stats h2 {
+  margin: 20px 0 4px;
+  font-size: var(--fs-md);
 }
 
 .card-sub {
   margin: 0 0 14px;
   color: var(--text-soft);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
-/* ---- controls ---- */
-.controls-card {
+/* ---- disclosure groups ---- */
+.group {
+  border-top: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.group:first-of-type {
+  border-top: 0;
+}
+
+.group[open] {
+  padding-bottom: 18px;
+}
+
+.group > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 -20px;
+  padding: 14px 20px;
+  list-style: none;
+}
+
+.group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.group[open] > summary {
+  background: var(--bg);
+}
+
+.group > summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: 2px solid var(--text-soft);
+  border-bottom: 2px solid var(--text-soft);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.group[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group > summary::before {
+    transition: none;
+  }
+}
+
+.group-title {
+  font-weight: 600;
+}
+
+.group-summary {
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  text-align: right;
+}
+
+/* ---- controls (chart toolbar) ---- */
+.chart-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -99,11 +217,9 @@ main {
 }
 
 .control-label {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .segmented {
@@ -118,7 +234,7 @@ main {
   background: var(--card);
   padding: 8px 14px;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   color: var(--text-soft);
   cursor: pointer;
 }
@@ -128,13 +244,13 @@ main {
 }
 
 .segmented button.active {
-  background: var(--accent);
+  background: var(--text);
   color: #fff;
 }
 
 select {
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -142,18 +258,9 @@ select {
   color: var(--text);
 }
 
-.controls-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-  align-self: flex-end;
-}
-
 .btn-secondary {
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   padding: 8px 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -167,11 +274,6 @@ select {
   color: var(--accent);
 }
 
-.import-status {
-  font-size: 0.85rem;
-  color: var(--text-soft);
-}
-
 /* ---- researched tech toggles ---- */
 .techs-list {
   display: flex;
@@ -183,31 +285,93 @@ select {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
-/* ---- sell price bonuses ---- */
-.bonus-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.bonus-grid input {
-  font: inherit;
-  width: 90px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
 .control-hint {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--text-soft);
 }
 
-/* ---- managers ---- */
+/* ---- mothership rooms ---- */
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 32px;
+  margin-bottom: 16px;
+}
+
+.room-row {
+  display: grid;
+  grid-template-columns: 96px 60px 52px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.room-row input {
+  font: inherit;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: right;
+}
+
+.room-label {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+
+.room-effect {
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+}
+
+/* ---- station nodes ---- */
+.station-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.station-category-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.station-name {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+
+.station-nodes {
+  display: grid;
+  grid-template-columns: repeat(var(--node-count, 5), minmax(52px, 1fr));
+  gap: 10px;
+}
+
+.station-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.station-node input {
+  font: inherit;
+  width: 100%;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* ---- managers / modules ---- */
 .manager-row {
   display: flex;
   align-items: center;
@@ -252,9 +416,8 @@ select {
 .chart-legend {
   display: flex;
   gap: 18px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--text-soft);
-  margin-bottom: 12px;
 }
 
 .chart-legend span {
@@ -270,8 +433,14 @@ select {
   display: inline-block;
 }
 
+/* Caps the panel to roughly one viewport with its own internal scroll —
+ * with every alloy/item unlocked the canvas grows to ~2800px tall (26px per
+ * row), which would otherwise push the settings below a full screen-height
+ * of chart. Rows are sorted profit-first by default, so the top of the
+ * scroll already answers the question the chart exists to answer. */
 .chart-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: min(640px, calc(100vh - 220px));
 }
 
 .chart-canvas-wrap {
@@ -280,8 +449,8 @@ select {
 }
 
 .chart-note {
-  margin: 12px 0 0;
-  font-size: 0.82rem;
+  margin: 0;
+  font-size: var(--fs-sm);
   color: var(--text-soft);
   min-height: 1.2em;
 }
@@ -300,7 +469,7 @@ select {
   min-width: 1150px;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .stat-table th:nth-child(1),
@@ -359,9 +528,8 @@ select {
 }
 
 .stat-table th {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-sm);
+  font-weight: 600;
   color: var(--text-soft);
 }
 
@@ -395,7 +563,6 @@ select {
 /* Base price and effective sell price: computed, not directly editable. */
 .price-readonly {
   color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
 }
 
 .stat-table td.price-readonly[data-eff-for] {
@@ -407,9 +574,9 @@ select {
   width: 78px;
 }
 
-.stat-table input.invalid {
+input.invalid {
   border-color: var(--danger);
-  background: #fdf3f2;
+  background: var(--danger-bg);
 }
 
 .stat-table tr.locked td:not(:first-child) {
@@ -449,30 +616,50 @@ select {
   width: 60px;
 }
 
-.stats-card h3 {
-  margin-top: 18px;
-}
-
 /* ---- focus ---- */
 button:focus-visible,
 select:focus-visible,
 input:focus-visible,
-a:focus-visible {
+a:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ---- mobile ---- */
+/* ---- responsive ---- */
+@media (max-width: 900px) {
+  .rooms-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .site-header {
-    padding: 24px 16px 8px;
+    padding: 24px 16px 0;
   }
 
   main {
     padding: 16px 16px 48px;
   }
 
-  .card {
+  .chart-panel,
+  .setup,
+  .stats {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .group > summary {
+    margin: 0 -14px;
     padding: 14px;
+  }
+
+  .room-row {
+    grid-template-columns: 84px 56px 48px 1fr;
+    font-size: var(--fs-sm);
+  }
+
+  .station-nodes {
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
   }
 }
