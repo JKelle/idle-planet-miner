@@ -90,16 +90,41 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Research-project multipliers for smelters (alloys) and crafting stations
-// (items), keyed by category, expressed so that effective = base * mult.
-// Ores have no entry (no craft time, no ingredients) — callers treat a
-// missing category as the identity multiplier. Value-project bonuses
-// (Advanced/Superior Alloy/Item Value) are handled separately by
-// sellPriceParts, since they apply to items too.
-function techMultipliers(techs) {
-  const on = (k) => (techs && techs[k] ? 1 : 0);
-  const smelterSpeed = Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace"));
-  const crafterSpeed = Math.pow(1.2, on("techAdvancedCrafting") + on("techSuperiorCrafting"));
+// Research-project, Station-node, and Manager multipliers for smelters
+// (alloys) and crafting stations (items), keyed by category, expressed so
+// that effective = base * mult. Ores have no entry (no craft time, no
+// ingredients) — callers treat a missing category as the identity
+// multiplier. Value-project bonuses (Advanced/Superior Alloy/Item Value) are
+// handled separately by sellPriceParts, since they apply to items too.
+//
+// Station "Smelting"/"Crafting" tech nodes (4 each) and an open-ended list of
+// Managers are additional real-game speed sources not modeled by a research
+// toggle: each Station node is its own independent multiplicative factor,
+// and each Manager optionally boosts either smelt or craft speed (never
+// both) by its own factor. All speed sources for a category — research
+// techs, Station nodes, and Managers — combine by straight multiplication.
+function techMultipliers(controls) {
+  const on = (k) => (controls && controls[k] ? 1 : 0);
+  const num = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 1);
+
+  const stationSmeltMult = num("smelting1") * num("smelting2") * num("smelting3") * num("smelting4");
+  const stationCraftMult = num("crafting1") * num("crafting2") * num("crafting3") * num("crafting4");
+
+  const managers = controls && Array.isArray(controls.managers) ? controls.managers : [];
+  let managerSmeltMult = 1;
+  let managerCraftMult = 1;
+  for (const m of managers) {
+    if (!m) continue;
+    const amt =
+      typeof m.boostAmount === "number" && isFinite(m.boostAmount) && m.boostAmount > 0 ? m.boostAmount : 1;
+    if (m.boostType === "smelt") managerSmeltMult *= amt;
+    else if (m.boostType === "craft") managerCraftMult *= amt;
+  }
+
+  const smelterSpeed =
+    Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace")) * stationSmeltMult * managerSmeltMult;
+  const crafterSpeed =
+    Math.pow(1.2, on("techAdvancedCrafting") + on("techSuperiorCrafting")) * stationCraftMult * managerCraftMult;
   return {
     alloy: {
       smeltTimeSeconds: 1 / smelterSpeed,

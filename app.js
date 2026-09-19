@@ -19,6 +19,14 @@
     "salesRoom",
     "station",
     "marketingRoom",
+    "smelting1",
+    "smelting2",
+    "smelting3",
+    "smelting4",
+    "crafting1",
+    "crafting2",
+    "crafting3",
+    "crafting4",
   ];
 
   // Bump this whenever a stat key is removed/renamed or an override's shape
@@ -109,6 +117,19 @@
       salesRoom: 1.45,
       station: 1.04,
       marketingRoom: 1.0,
+      // Station "Smelting"/"Crafting" tech nodes (4 each) and a Manager list,
+      // each an independent multiplicative speed factor not otherwise
+      // modeled — see techMultipliers in model.js. Defaults of 1 mean "no
+      // bonus", same convention as marketingRoom above.
+      smelting1: 1,
+      smelting2: 1,
+      smelting3: 1,
+      smelting4: 1,
+      crafting1: 1,
+      crafting2: 1,
+      crafting3: 1,
+      crafting4: 1,
+      managers: [],
     };
   }
 
@@ -189,6 +210,28 @@
         delete incomingControls[k];
       }
     }
+
+    // Managers is an array, so it needs per-entry validation rather than the
+    // scalar keep-or-delete check above. Malformed entries are dropped
+    // rather than poisoning the calc; ids are de-duped/backfilled so the
+    // manager list can always be keyed and rendered safely.
+    const rawManagers = Array.isArray(incomingControls.managers) ? incomingControls.managers : [];
+    const seenManagerIds = new Set();
+    const cleanManagers = [];
+    for (const m of rawManagers) {
+      if (!m || typeof m !== "object") continue;
+      const boostType = ["none", "smelt", "craft"].includes(m.boostType) ? m.boostType : "none";
+      const boostAmount =
+        typeof m.boostAmount === "number" && isFinite(m.boostAmount) && m.boostAmount > 0
+          ? m.boostAmount
+          : 1;
+      const name = typeof m.name === "string" ? m.name : "";
+      let id = typeof m.id === "string" && m.id && !seenManagerIds.has(m.id) ? m.id : null;
+      if (!id) id = "m" + Math.random().toString(36).slice(2, 10);
+      seenManagerIds.add(id);
+      cleanManagers.push({ id, name, boostType, boostAmount });
+    }
+    incomingControls.managers = cleanManagers;
 
     return {
       version: STORAGE_VERSION,
@@ -804,7 +847,102 @@
     ["bonus-marketing-room", "marketingRoom"],
   ];
 
+  // Input id <-> controls key for each Station "Smelting"/"Crafting" node.
+  // Shared by initControls (wiring) and syncControlsUI (post-import resync).
+  // Unlike BONUS_INPUTS these feed techMultipliers (smelt/craft time), not
+  // just price, so their change handler triggers a full renderAll() the same
+  // way TECH_TOGGLES does.
+  const SPEED_STATION_INPUTS = [
+    ["bonus-smelting-1", "smelting1"],
+    ["bonus-smelting-2", "smelting2"],
+    ["bonus-smelting-3", "smelting3"],
+    ["bonus-smelting-4", "smelting4"],
+    ["bonus-crafting-1", "crafting1"],
+    ["bonus-crafting-2", "crafting2"],
+    ["bonus-crafting-3", "crafting3"],
+    ["bonus-crafting-4", "crafting4"],
+  ];
+
   // ---- controls ----------------------------------------------------
+
+  // Rebuilds the #managers-list rows from state.controls.managers. Each row
+  // mutates its manager object in place (a live reference into that array)
+  // before saveState(), the same convention used elsewhere in this file for
+  // per-entity overrides.
+  function renderManagersList() {
+    const container = document.getElementById("managers-list");
+    container.innerHTML = "";
+    for (const m of state.controls.managers) {
+      const row = document.createElement("div");
+      row.className = "manager-row";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.value = m.name;
+      nameInput.placeholder = "Manager name";
+      nameInput.setAttribute("aria-label", "Manager name");
+      nameInput.addEventListener("input", () => {
+        m.name = nameInput.value;
+        saveState();
+      });
+
+      const typeSelect = document.createElement("select");
+      for (const [value, label] of [
+        ["none", "No speed boost"],
+        ["smelt", "Smelt speed"],
+        ["craft", "Craft speed"],
+      ]) {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        if (m.boostType === value) opt.selected = true;
+        typeSelect.appendChild(opt);
+      }
+      typeSelect.setAttribute("aria-label", `${m.name || "Manager"} boost type`);
+
+      const amountInput = document.createElement("input");
+      amountInput.type = "number";
+      amountInput.min = "0";
+      amountInput.step = "any";
+      amountInput.value = String(m.boostAmount);
+      amountInput.disabled = m.boostType === "none";
+      amountInput.setAttribute("aria-label", `${m.name || "Manager"} boost amount`);
+
+      typeSelect.addEventListener("change", () => {
+        m.boostType = typeSelect.value;
+        amountInput.disabled = m.boostType === "none";
+        saveState();
+        renderAll();
+      });
+
+      amountInput.addEventListener("input", () => {
+        const raw = amountInput.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && n > 0;
+        amountInput.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        m.boostAmount = n;
+        saveState();
+        renderAll();
+      });
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "manager-remove";
+      removeBtn.textContent = "×";
+      removeBtn.setAttribute("aria-label", `Remove ${m.name || "manager"}`);
+      removeBtn.addEventListener("click", () => {
+        state.controls.managers = state.controls.managers.filter((x) => x.id !== m.id);
+        saveState();
+        renderManagersList();
+        renderAll();
+      });
+
+      row.append(nameInput, typeSelect, amountInput, removeBtn);
+      container.appendChild(row);
+    }
+  }
+
   function initControls() {
     segmented("scale-control", "scale");
     segmented("category-control", "category");
@@ -844,6 +982,35 @@
         renderChart();
       });
     }
+
+    for (const [inputId, key] of SPEED_STATION_INPUTS) {
+      const input = document.getElementById(inputId);
+      input.value = String(state.controls[key]);
+      input.addEventListener("input", () => {
+        const raw = input.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && n > 0;
+        input.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        state.controls[key] = n;
+        saveState();
+        // Station nodes change the stat table's effective smelt/craft time,
+        // not just price, so this needs the full re-render (like TECH_TOGGLES).
+        renderAll();
+      });
+    }
+
+    document.getElementById("add-manager-btn").addEventListener("click", () => {
+      state.controls.managers.push({
+        id: "m" + Math.random().toString(36).slice(2, 10),
+        name: "",
+        boostType: "none",
+        boostAmount: 1,
+      });
+      saveState();
+      renderManagersList();
+    });
+    renderManagersList();
 
     document.getElementById("reset-all").addEventListener("click", () => {
       if (!confirm("Reset every stat and unlock back to the game defaults?")) return;
@@ -933,6 +1100,10 @@
     for (const [inputId, key] of BONUS_INPUTS) {
       document.getElementById(inputId).value = String(state.controls[key]);
     }
+    for (const [inputId, key] of SPEED_STATION_INPUTS) {
+      document.getElementById(inputId).value = String(state.controls[key]);
+    }
+    renderManagersList();
   }
 
   function segmented(containerId, controlKey) {

@@ -9,7 +9,7 @@
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
   <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=1" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <header class="site-header">
@@ -127,6 +127,52 @@
       </div>
     </section>
 
+    <section class="card speed-card" aria-label="Smelt/craft speed bonuses">
+      <h2>Smelt/craft speed bonuses</h2>
+      <p class="card-sub">
+        Station tech nodes and Managers that boost smelter/crafter speed, on
+        top of the Researched tech above. Each is a multiplier; 1 = no bonus.
+      </p>
+      <div class="bonus-grid">
+        <div class="control-group">
+          <label class="control-label" for="bonus-smelting-1">Smelting 1</label>
+          <input type="number" id="bonus-smelting-1" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-smelting-2">Smelting 2</label>
+          <input type="number" id="bonus-smelting-2" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-smelting-3">Smelting 3</label>
+          <input type="number" id="bonus-smelting-3" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-smelting-4">Smelting 4</label>
+          <input type="number" id="bonus-smelting-4" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-crafting-1">Crafting 1</label>
+          <input type="number" id="bonus-crafting-1" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-crafting-2">Crafting 2</label>
+          <input type="number" id="bonus-crafting-2" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-crafting-3">Crafting 3</label>
+          <input type="number" id="bonus-crafting-3" min="0" step="any" />
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-crafting-4">Crafting 4</label>
+          <input type="number" id="bonus-crafting-4" min="0" step="any" />
+        </div>
+      </div>
+
+      <h3>Managers</h3>
+      <div id="managers-list"></div>
+      <button type="button" id="add-manager-btn" class="btn-secondary">+ Add manager</button>
+    </section>
+
     <section class="card bonuses-card" aria-label="Sell price bonuses">
       <h2>Sell price bonuses</h2>
       <p class="card-sub">
@@ -235,8 +281,8 @@
   <!-- ?v=N cache-busts GitHub Pages' 10-minute asset cache against this
        file's own caching, so a freshly-loaded page never runs stale JS/CSS
        against fresh markup. Bump v on any deploy touching these 4 files. -->
-  <script src="data.js?v=1"></script>
-  <script src="model.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="data.js?v=2"></script>
+  <script src="model.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

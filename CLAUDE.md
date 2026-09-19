@@ -108,3 +108,22 @@ dropped so a future rename can't silently discard someone's edits.
   `localStorage` can also be lost outside of any deploy (Safari/iOS
   eviction, cleared site data, a new device/browser), which the versioned
   schema above can't help with.
+
+## Cache-busting (web app)
+
+`index.html` loads `styles.css`/`data.js`/`model.js`/`app.js` each with its
+own `?v=N` query string, since GitHub Pages caches aggressively and a stale
+`v` means a returning player's browser can keep running old JS/CSS after a
+deploy — silently, with no error.
+
+- **Bump the `v` for every one of those four files a commit touches, in
+  that same commit.** Easy to forget because the version lives in
+  `index.html`, not the file you're actually editing. It's already bitten
+  this project once: the "Round computed smelt/craft times" fix shipped
+  touching `model.js`/`app.js` without bumping either `v`, so a returning
+  player with either file cached could have missed it entirely.
+- This also affects local testing, not just deploys: a browser profile
+  that has ever loaded this app's `localhost` origin before will keep
+  serving cached JS on later test sessions too, unless the `v` changes (or
+  you force a hard reload) — a stale-looking result may just be a stale
+  cache, not a bug in the edit itself.

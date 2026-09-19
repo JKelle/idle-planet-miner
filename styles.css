@@ -207,6 +207,47 @@ select {
   color: var(--text-soft);
 }
 
+/* ---- managers ---- */
+.manager-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.manager-row input[type="text"] {
+  flex: 1;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.manager-row input[type="number"] {
+  width: 90px;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.manager-remove {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-soft);
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.manager-remove:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---- chart ---- */
 .chart-legend {
   display: flex;
