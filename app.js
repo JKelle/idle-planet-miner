@@ -51,7 +51,7 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 5;
+  const STORAGE_VERSION = 6;
 
   // Market roll presets, matching what the in-game Market dialog offers.
   const MARKET_OPTIONS = [
@@ -180,6 +180,15 @@
         ? parsed.overrides
         : {};
 
+    // v5 -> v6: data.js's ingredient amounts changed from the player's own
+    // boosted (post-reduction) in-game numbers to the game's true base
+    // recipe amounts — see the comment at the top of data.js. A saved
+    // per-ingredient override already has the player's own boost baked in
+    // and can't be un-baked, so like the v1->v2/v2->v3 drops below it's
+    // dropped rather than migrated: keeping it would silently double-apply
+    // the reduction once techMultipliers layers the modeled boosts on top.
+    const preV6 = !parsed || typeof parsed.version !== "number" || parsed.version < 6;
+
     const clean = {};
     for (const [id, ov] of Object.entries(overrides)) {
       if (!ov || typeof ov !== "object") continue;
@@ -190,7 +199,7 @@
         }
       }
       if (typeof ov.unlocked === "boolean") entry.unlocked = ov.unlocked;
-      if (ov.ingredients && typeof ov.ingredients === "object") {
+      if (!preV6 && ov.ingredients && typeof ov.ingredients === "object") {
         const cleanIng = {};
         for (const [sid, amt] of Object.entries(ov.ingredients)) {
           if (typeof amt === "number" && isFinite(amt) && amt > 0) {
