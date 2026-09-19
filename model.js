@@ -90,25 +90,49 @@ function newMemos() {
   return { cost: new Map(), time: new Map() };
 }
 
-// Research-project, Station-node, and Manager multipliers for smelters
-// (alloys) and crafting stations (items), keyed by category, expressed so
-// that effective = base * mult. Ores have no entry (no craft time, no
-// ingredients) — callers treat a missing category as the identity
+// Forge/Workshop room level -> smelt/craft speed multiplier. Level 0 = not
+// purchased (identity). From the wiki's Rooms page: base x1.20 at level 1,
+// +0.10 per additional level, capping at level 60 (x7.10). Verified against
+// a real level-10 Forge: 1.20 + 0.10*9 = 2.10x.
+function roomSpeedMultiplier(level) {
+  const lvl = Math.max(0, Math.min(60, Math.floor(level) || 0));
+  return lvl === 0 ? 1 : 1.2 + 0.1 * (lvl - 1);
+}
+
+// Underforge/Dorm room level -> ingredient-amount multiplier (a reduction,
+// always <= 1). Level 0 = not purchased (identity). From the wiki: x90% at
+// level 1, -4% per additional level, capping at level 11 (x50%).
+function roomIngredientMultiplier(level) {
+  const lvl = Math.max(0, Math.min(11, Math.floor(level) || 0));
+  return lvl === 0 ? 1 : 0.9 - 0.04 * (lvl - 1);
+}
+
+// Research-project, Mothership-Room, Station-node, and Manager multipliers
+// for smelters (alloys) and crafting stations (items), keyed by category,
+// expressed so that effective = base * mult. Ores have no entry (no craft
+// time, no ingredients) — callers treat a missing category as the identity
 // multiplier. Value-project bonuses (Advanced/Superior Alloy/Item Value) are
 // handled separately by sellPriceParts, since they apply to items too.
 //
-// Station "Smelting"/"Crafting" tech nodes (4 each) and an open-ended list of
-// Managers are additional real-game speed sources not modeled by a research
-// toggle: each Station node is its own independent multiplicative factor,
-// and each Manager optionally boosts either smelt or craft speed (never
-// both) by its own factor. All speed sources for a category — research
-// techs, Station nodes, and Managers — combine by straight multiplication.
+// Station "Smelting"/"Crafting" tech nodes (4 each), the Forge/Workshop/
+// Underforge/Dorm Mothership Rooms, and an open-ended list of Managers are
+// additional real-game sources not modeled by a research toggle: each
+// Station node is its own independent multiplicative factor, each Room's
+// level maps to a multiplier via the formulas above, and each Manager
+// optionally boosts either smelt or craft speed (never both) by its own
+// factor. All sources for a category combine by straight multiplication.
 function techMultipliers(controls) {
   const on = (k) => (controls && controls[k] ? 1 : 0);
   const num = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 1);
+  const level = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 0);
 
   const stationSmeltMult = num("smelting1") * num("smelting2") * num("smelting3") * num("smelting4");
   const stationCraftMult = num("crafting1") * num("crafting2") * num("crafting3") * num("crafting4");
+
+  const forgeMult = roomSpeedMultiplier(level("forgeLevel"));
+  const workshopMult = roomSpeedMultiplier(level("workshopLevel"));
+  const underforgeMult = roomIngredientMultiplier(level("underforgeLevel"));
+  const dormMult = roomIngredientMultiplier(level("dormLevel"));
 
   const managers = controls && Array.isArray(controls.managers) ? controls.managers : [];
   let managerSmeltMult = 1;
@@ -122,17 +146,23 @@ function techMultipliers(controls) {
   }
 
   const smelterSpeed =
-    Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace")) * stationSmeltMult * managerSmeltMult;
+    Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace")) *
+    stationSmeltMult *
+    managerSmeltMult *
+    forgeMult;
   const crafterSpeed =
-    Math.pow(1.2, on("techAdvancedCrafting") + on("techSuperiorCrafting")) * stationCraftMult * managerCraftMult;
+    Math.pow(1.2, on("techAdvancedCrafting") + on("techSuperiorCrafting")) *
+    stationCraftMult *
+    managerCraftMult *
+    workshopMult;
   return {
     alloy: {
       smeltTimeSeconds: 1 / smelterSpeed,
-      ingredient: on("techSmeltingEfficiency") ? 0.8 : 1,
+      ingredient: (on("techSmeltingEfficiency") ? 0.8 : 1) * underforgeMult,
     },
     item: {
       smeltTimeSeconds: 1 / crafterSpeed,
-      ingredient: on("techCraftingEfficiency") ? 0.8 : 1,
+      ingredient: (on("techCraftingEfficiency") ? 0.8 : 1) * dormMult,
     },
   };
 }
@@ -272,6 +302,8 @@ if (typeof module !== "undefined" && module.exports) {
     profitPerSecond,
     newMemos,
     techMultipliers,
+    roomSpeedMultiplier,
+    roomIngredientMultiplier,
     roundHalfEven,
     effectiveIngredientAmount,
     effectiveSmeltTime,

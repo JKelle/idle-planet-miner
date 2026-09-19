@@ -29,6 +29,18 @@
     "crafting4",
   ];
 
+  // Room level control keys -> max level (see roomSpeedMultiplier /
+  // roomIngredientMultiplier in model.js). Integer levels where 0 is valid
+  // ("not purchased"), unlike BONUS_CONTROL_KEYS's multiplier fields where 0
+  // would be nonsensical — so these get their own validation loop below
+  // rather than joining that list.
+  const ROOM_LEVEL_KEYS = {
+    forgeLevel: 60,
+    workshopLevel: 60,
+    underforgeLevel: 11,
+    dormLevel: 11,
+  };
+
   // Bump this whenever a stat key is removed/renamed or an override's shape
   // changes, and add a migration step in normalizeState below. Never change
   // STORAGE_KEY itself (that would just orphan everyone's existing save under
@@ -58,6 +70,8 @@
     profitPerSecond,
     newMemos,
     techMultipliers,
+    roomSpeedMultiplier,
+    roomIngredientMultiplier,
     effectiveIngredientAmount,
     effectiveSmeltTime,
     formatMoney,
@@ -130,6 +144,14 @@
       crafting3: 1,
       crafting4: 1,
       managers: [],
+      // Forge/Workshop/Underforge/Dorm Mothership Room levels. Unlike the
+      // multiplier fields above, 0 is a valid, common value here ("haven't
+      // bought this room yet") — see ROOM_LEVEL_KEYS below, which validates
+      // these separately from BONUS_CONTROL_KEYS for exactly that reason.
+      forgeLevel: 0,
+      workshopLevel: 0,
+      underforgeLevel: 0,
+      dormLevel: 0,
     };
   }
 
@@ -207,6 +229,13 @@
     }
     for (const k of BONUS_CONTROL_KEYS) {
       if (!(typeof incomingControls[k] === "number" && isFinite(incomingControls[k]) && incomingControls[k] > 0)) {
+        delete incomingControls[k];
+      }
+    }
+
+    for (const [k, max] of Object.entries(ROOM_LEVEL_KEYS)) {
+      const v = incomingControls[k];
+      if (!(typeof v === "number" && isFinite(v) && Number.isInteger(v) && v >= 0 && v <= max)) {
         delete incomingControls[k];
       }
     }
@@ -863,6 +892,26 @@
     ["bonus-crafting-4", "crafting4"],
   ];
 
+  // Input id <-> controls key <-> formula kind <-> max level, for each
+  // Mothership Room whose level feeds techMultipliers. "speed" rooms
+  // (Forge/Workshop) use roomSpeedMultiplier; "ingredient" rooms
+  // (Underforge/Dorm) use roomIngredientMultiplier. Shared by initControls
+  // (wiring) and syncControlsUI (post-import resync); the hint span id is
+  // derived from the input id (bonus-smelting-1 style ids aren't reused here
+  // since Rooms are a distinct source from Station nodes).
+  const ROOM_LEVEL_INPUTS = [
+    ["room-forge-level", "forgeLevel", "speed", 60],
+    ["room-workshop-level", "workshopLevel", "speed", 60],
+    ["room-underforge-level", "underforgeLevel", "ingredient", 11],
+    ["room-dorm-level", "dormLevel", "ingredient", 11],
+  ];
+
+  // Formats a Room level's computed multiplier for its hint span, e.g. "2.10x".
+  function roomMultiplierHint(kind, level) {
+    const mult = kind === "speed" ? F().roomSpeedMultiplier(level) : F().roomIngredientMultiplier(level);
+    return Number(mult.toFixed(2)) + "x";
+  }
+
   // ---- controls ----------------------------------------------------
 
   // Rebuilds the #managers-list rows from state.controls.managers. Each row
@@ -1000,6 +1049,26 @@
       });
     }
 
+    for (const [inputId, key, kind, max] of ROOM_LEVEL_INPUTS) {
+      const input = document.getElementById(inputId);
+      const hint = document.getElementById(inputId.replace("-level", "-hint"));
+      input.value = String(state.controls[key]);
+      hint.textContent = roomMultiplierHint(kind, state.controls[key]);
+      input.addEventListener("input", () => {
+        const raw = input.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 0 && n <= max;
+        input.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        state.controls[key] = n;
+        hint.textContent = roomMultiplierHint(kind, n);
+        saveState();
+        // Rooms change the stat table's effective smelt/craft time or
+        // ingredient cost, not just price, so this needs the full re-render.
+        renderAll();
+      });
+    }
+
     document.getElementById("add-manager-btn").addEventListener("click", () => {
       state.controls.managers.push({
         id: "m" + Math.random().toString(36).slice(2, 10),
@@ -1102,6 +1171,13 @@
     }
     for (const [inputId, key] of SPEED_STATION_INPUTS) {
       document.getElementById(inputId).value = String(state.controls[key]);
+    }
+    for (const [inputId, key, kind] of ROOM_LEVEL_INPUTS) {
+      document.getElementById(inputId).value = String(state.controls[key]);
+      document.getElementById(inputId.replace("-level", "-hint")).textContent = roomMultiplierHint(
+        kind,
+        state.controls[key]
+      );
     }
     renderManagersList();
   }

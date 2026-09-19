@@ -127,12 +127,39 @@
       </div>
     </section>
 
-    <section class="card speed-card" aria-label="Smelt/craft speed bonuses">
-      <h2>Smelt/craft speed bonuses</h2>
+    <section class="card speed-card" aria-label="Smelt/craft speed & ingredient bonuses">
+      <h2>Smelt/craft speed & ingredient bonuses</h2>
       <p class="card-sub">
-        Station tech nodes and Managers that boost smelter/crafter speed, on
-        top of the Researched tech above. Each is a multiplier; 1 = no bonus.
+        Mothership Rooms, Station tech nodes, and Managers that boost
+        smelter/crafter speed or reduce ingredient costs, on top of the
+        Researched tech above. 1 = no bonus.
       </p>
+
+      <h3>Rooms</h3>
+      <div class="bonus-grid">
+        <div class="control-group">
+          <label class="control-label" for="room-forge-level">Forge level</label>
+          <input type="number" id="room-forge-level" min="0" max="60" step="1" />
+          <span class="control-hint" id="room-forge-hint"></span>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="room-workshop-level">Workshop level</label>
+          <input type="number" id="room-workshop-level" min="0" max="60" step="1" />
+          <span class="control-hint" id="room-workshop-hint"></span>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="room-underforge-level">Underforge level</label>
+          <input type="number" id="room-underforge-level" min="0" max="11" step="1" />
+          <span class="control-hint" id="room-underforge-hint"></span>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="room-dorm-level">Dorm level</label>
+          <input type="number" id="room-dorm-level" min="0" max="11" step="1" />
+          <span class="control-hint" id="room-dorm-hint"></span>
+        </div>
+      </div>
+
+      <h3>Station nodes</h3>
       <div class="bonus-grid">
         <div class="control-group">
           <label class="control-label" for="bonus-smelting-1">Smelting 1</label>
@@ -282,7 +309,7 @@
        file's own caching, so a freshly-loaded page never runs stale JS/CSS
        against fresh markup. Bump v on any deploy touching these 4 files. -->
   <script src="data.js?v=2"></script>
-  <script src="model.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="model.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
