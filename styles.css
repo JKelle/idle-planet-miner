@@ -155,7 +155,6 @@ main {
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   margin: 0 -20px;
   padding: 14px 20px;
@@ -197,6 +196,7 @@ main {
 }
 
 .group-summary {
+  margin-left: auto;
   color: var(--text-soft);
   font-size: var(--fs-sm);
   text-align: right;
