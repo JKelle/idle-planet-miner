@@ -50,6 +50,8 @@
     profitPerSecond,
     newMemos,
     techMultipliers,
+    effectiveIngredientAmount,
+    effectiveSmeltTime,
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
@@ -266,9 +268,9 @@
     return Object.assign({}, entity, {
       ingredients: entity.ingredients.map((i) => ({
         sellableId: i.sellableId,
-        amount: i.amount * m.ingredient,
+        amount: F().effectiveIngredientAmount(i.amount, m.ingredient),
       })),
-      smeltTimeSeconds: entity.smeltTimeSeconds * m.smeltTimeSeconds,
+      smeltTimeSeconds: F().effectiveSmeltTime(entity.smeltTimeSeconds, m.smeltTimeSeconds),
     });
   }
 
@@ -572,7 +574,7 @@
       input.classList.toggle("invalid", !ok);
       if (!ok) return;
       setStat(id, key, n);
-      if (effInput) effInput.value = fieldValue(n * mult);
+      if (effInput) effInput.value = fieldValue(F().effectiveSmeltTime(n, mult));
       renderChart();
     });
     wrap.appendChild(input);
@@ -592,7 +594,7 @@
         effInput.min = "0";
         effInput.step = opts.integer ? "1" : "any";
       }
-      effInput.value = fieldValue(entity[key] * mult);
+      effInput.value = fieldValue(F().effectiveSmeltTime(entity[key], mult));
       effInput.setAttribute("aria-label", `${entity.name} ${key} (effective)`);
       effInput.addEventListener("input", () => {
         const raw = effInput.value.trim();
@@ -737,7 +739,7 @@
         input.classList.toggle("invalid", !ok);
         if (!ok) return;
         setIngredientAmount(id, ing.sellableId, n);
-        if (effInput) effInput.value = String(n * mult);
+        if (effInput) effInput.value = String(F().effectiveIngredientAmount(n, mult));
         renderChart();
       });
 
@@ -755,7 +757,7 @@
         effInput.type = "number";
         effInput.min = "0";
         effInput.step = "any";
-        effInput.value = String(ing.amount * mult);
+        effInput.value = String(F().effectiveIngredientAmount(ing.amount, mult));
         effInput.className = "eff-input";
         effInput.setAttribute(
           "aria-label",

@@ -112,6 +112,37 @@ function techMultipliers(techs) {
   };
 }
 
+// Round half to even ("banker's rounding") — the one tie-breaking rule the
+// wiki documents for this game (Upgraded Base Cargo). Used for every rounded
+// game quantity below so a single rule covers ingredients, times, and any
+// modifier added later. Exact .5 ties are reachable in practice — e.g.
+// Osmium Bar's 315s smelt time at the Advanced Furnace multiplier (1/1.2) is
+// exactly 262.5.
+function roundHalfEven(value) {
+  const floor = Math.floor(value);
+  const diff = value - floor;
+  if (diff > 0.5) return floor + 1;
+  if (diff < 0.5) return floor;
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
+// Effective ingredient amount after a researched-efficiency multiplier. The
+// game rounds the reduced amount to the nearest whole unit and never below 1:
+// at Underforge L4 (-22%) a base-2 recipe still costs 2 (1.56 -> 2), and only
+// at L5 (-26%) does it drop to 1 (1.48 -> 1). A multiplier of 1 is passed
+// through untouched so a player-entered amount is never rewritten.
+function effectiveIngredientAmount(amount, mult) {
+  if (mult === 1) return amount;
+  return Math.max(1, roundHalfEven(amount * mult));
+}
+
+// Effective smelt/craft time after a researched-speed multiplier, in whole
+// seconds. Like the above, mult === 1 passes the player's own value through.
+function effectiveSmeltTime(seconds, mult) {
+  if (mult === 1) return seconds;
+  return roundHalfEven(seconds * mult);
+}
+
 // Port of format_money_per_sec in profit.py: 4 sig figs, game-suffix scaling.
 // Above the top suffix (only reachable with late locked tiers) falls back to
 // exponent form rather than inventing suffix names.
@@ -216,6 +247,9 @@ if (typeof module !== "undefined" && module.exports) {
     profitPerSecond,
     newMemos,
     techMultipliers,
+    roundHalfEven,
+    effectiveIngredientAmount,
+    effectiveSmeltTime,
     formatMoney,
     formatMoneyPerSec,
     formatCompact,
