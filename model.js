@@ -40,11 +40,14 @@ function moduleEffectMultiplier(controls, category) {
 }
 
 // Multiplicative decomposition of a sellable's price, mirroring profit.py's
-// get_sell_price. Ores get no sales-room, station-value, value-project, or
-// Module-value bonus — those are alloy/item-only in-game. Alloys and items
-// share a single station-value control since they always move together in
-// -game. The Marketing room scales positive market boosts only (a x3 market
-// at Marketing 2.50 sells for x7.5); a glut market (< 1) is never scaled.
+// get_sell_price. Ores get no sales-room, station-value, or value-project
+// bonus — those are alloy/item-only in-game. Module-value bonuses can still
+// target ores though (e.g. the Multiweave Hub's value sub-effect), so
+// moduleValue is computed for every category, including ore. Alloys and
+// items share a single station-value control since they always move
+// together in-game. The Marketing room scales positive market boosts only
+// (a x3 market at Marketing 2.50 sells for x7.5); a glut market (< 1) is
+// never scaled.
 function sellPriceParts(entity, controls) {
   const base = entity.basePrice;
   const star = 1 + 0.2 * entity.stars;
@@ -61,9 +64,10 @@ function sellPriceParts(entity, controls) {
 
   const sales = isOre ? 1 : controls.salesRoom;
 
-  const moduleValue = isOre
-    ? 1
-    : moduleEffectMultiplier(controls, entity.category === "alloy" ? "alloyValue" : "itemValue");
+  const moduleValue = moduleEffectMultiplier(
+    controls,
+    isOre ? "oreValue" : entity.category === "alloy" ? "alloyValue" : "itemValue"
+  );
 
   const rawMarket = typeof entity.market === "number" ? entity.market : 1;
   const market = rawMarket > 1 ? rawMarket * controls.marketingRoom : rawMarket;

@@ -283,6 +283,7 @@
       "craftSpeed",
       "alloyIngredient",
       "itemIngredient",
+      "oreValue",
       "alloyValue",
       "itemValue",
     ];
@@ -1031,16 +1032,18 @@
 
   // Category id <-> label for the Module-effect dropdown. Wider than
   // Managers' 3-value enum since a single Module effect can land in any of
-  // the 6 categories this app tracks (speed, ingredient cost, or sell
-  // value) — see moduleEffectMultiplier in model.js. An effect touching
-  // more than one category (a Module's "main effect" commonly boosts both
-  // smelt and craft speed at once) needs one row per category.
+  // the 7 categories this app tracks (speed, ingredient cost, or sell
+  // value, including ore value — e.g. the Multiweave Hub's value
+  // sub-effect) — see moduleEffectMultiplier in model.js. An effect
+  // touching more than one category (a Module's "main effect" commonly
+  // boosts both smelt and craft speed at once) needs one row per category.
   const MODULE_EFFECT_CATEGORY_LABELS = [
     ["none", "No effect"],
     ["smeltSpeed", "Smelt speed"],
     ["craftSpeed", "Craft speed"],
     ["alloyIngredient", "Alloy ingredient cost"],
     ["itemIngredient", "Item ingredient cost"],
+    ["oreValue", "Ore sell value"],
     ["alloyValue", "Alloy sell value"],
     ["itemValue", "Item sell value"],
   ];
