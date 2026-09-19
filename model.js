@@ -135,6 +135,36 @@ function roomIngredientMultiplier(level) {
   return lvl === 0 ? 1 : 0.9 - 0.04 * (lvl - 1);
 }
 
+// Station "Smelting"/"Crafting" tech-node ladder: [maxLevel, bonusPerLevel]
+// for node 1..5. From the game-data spreadsheet's Bonus/lvl row (IPM -
+// Subspace Station Costs, gid=0).
+const STATION_NODES = [
+  [5, 0.01],
+  [10, 0.01],
+  [15, 0.01],
+  [20, 0.02],
+  [20, 0.04],
+];
+
+// One station node's own bonus contribution at a given level (0 at level 0).
+function stationNodeBonus(index, level) {
+  const [max, perLevel] = STATION_NODES[index];
+  const lvl = Math.max(0, Math.min(max, Math.floor(level) || 0));
+  return lvl * perLevel;
+}
+
+// Five node levels -> the category's combined multiplier. Nodes stack
+// ADDITIVELY within a category (the sheet's Category Bonus of 2.50 at max
+// levels = 1 + 0.05+0.10+0.15+0.40+0.80, not the product of the per-node
+// totals), unlike every other source in techMultipliers, which multiply.
+function stationCategoryMultiplier(levels) {
+  let bonus = 0;
+  for (let i = 0; i < STATION_NODES.length; i++) {
+    bonus += stationNodeBonus(i, levels[i]);
+  }
+  return 1 + bonus;
+}
+
 // Research-project, Mothership-Room, Station-node, Manager, and Module
 // multipliers for smelters (alloys) and crafting stations (items), keyed by
 // category, expressed so that effective = base * mult. Ores have no entry
@@ -143,23 +173,36 @@ function roomIngredientMultiplier(level) {
 // Value) are handled separately by sellPriceParts, since they apply to
 // items too.
 //
-// Station "Smelting"/"Crafting" tech nodes (4 each), the Forge/Workshop/
+// Station "Smelting"/"Crafting" tech nodes (5 each), the Forge/Workshop/
 // Underforge/Dorm Mothership Rooms, an open-ended list of Managers, and an
 // open-ended list of Module effects are additional real-game sources not
-// modeled by a research toggle: each Station node is its own independent
-// multiplicative factor, each Room's level maps to a multiplier via the
-// formulas above, each Manager optionally boosts either smelt or craft
-// speed (never both) by its own factor, and each Module-effect row
-// (see moduleEffectMultiplier) does the same for whichever single category
-// it's tagged with. All sources for a category combine by straight
-// multiplication.
+// modeled by a research toggle: each Station node's level maps to that
+// node's own bonus via stationNodeBonus, and the 5 nodes in a category sum
+// additively into one category multiplier (see stationCategoryMultiplier —
+// this is the one exception to straight multiplication below). Each Room's
+// level maps to a multiplier via the formulas above, each Manager optionally
+// boosts either smelt or craft speed (never both) by its own factor, and
+// each Module-effect row (see moduleEffectMultiplier) does the same for
+// whichever single category it's tagged with. All sources for a category
+// then combine by straight multiplication.
 function techMultipliers(controls) {
   const on = (k) => (controls && controls[k] ? 1 : 0);
-  const num = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 1);
   const level = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 0);
 
-  const stationSmeltMult = num("smelting1") * num("smelting2") * num("smelting3") * num("smelting4");
-  const stationCraftMult = num("crafting1") * num("crafting2") * num("crafting3") * num("crafting4");
+  const stationSmeltMult = stationCategoryMultiplier([
+    level("smelting1"),
+    level("smelting2"),
+    level("smelting3"),
+    level("smelting4"),
+    level("smelting5"),
+  ]);
+  const stationCraftMult = stationCategoryMultiplier([
+    level("crafting1"),
+    level("crafting2"),
+    level("crafting3"),
+    level("crafting4"),
+    level("crafting5"),
+  ]);
 
   const forgeMult = roomSpeedMultiplier(level("forgeLevel"));
   const workshopMult = roomSpeedMultiplier(level("workshopLevel"));
@@ -338,6 +381,8 @@ if (typeof module !== "undefined" && module.exports) {
     techMultipliers,
     roomSpeedMultiplier,
     roomIngredientMultiplier,
+    stationNodeBonus,
+    stationCategoryMultiplier,
     moduleEffectMultiplier,
     roundHalfEven,
     effectiveIngredientAmount,

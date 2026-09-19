@@ -15,31 +15,35 @@
   // Numeric global-bonus control keys added in v3 — validated the same way as
   // STAT_KEYS (finite, non-negative) so a corrupted/hand-edited import can't
   // poison every price calculation with NaN or a negative multiplier.
-  const BONUS_CONTROL_KEYS = [
-    "salesRoom",
-    "station",
-    "marketingRoom",
-    "smelting1",
-    "smelting2",
-    "smelting3",
-    "smelting4",
-    "crafting1",
-    "crafting2",
-    "crafting3",
-    "crafting4",
-  ];
+  const BONUS_CONTROL_KEYS = ["salesRoom", "station", "marketingRoom"];
 
-  // Room level control keys -> max level (see roomSpeedMultiplier /
-  // roomIngredientMultiplier in model.js). Integer levels where 0 is valid
-  // ("not purchased"), unlike BONUS_CONTROL_KEYS's multiplier fields where 0
-  // would be nonsensical — so these get their own validation loop below
-  // rather than joining that list.
-  const ROOM_LEVEL_KEYS = {
+  // Level control keys (Rooms and, as of v5, Station nodes) -> max level (see
+  // roomSpeedMultiplier/roomIngredientMultiplier/stationNodeBonus in
+  // model.js). Integer levels where 0 is valid ("not purchased"), unlike
+  // BONUS_CONTROL_KEYS's multiplier fields where 0 would be nonsensical — so
+  // these get their own validation loop below rather than joining that list.
+  // Station node maxes mirror model.js's STATION_NODES table.
+  const LEVEL_CONTROL_KEYS = {
     forgeLevel: 60,
     workshopLevel: 60,
     underforgeLevel: 11,
     dormLevel: 11,
+    smelting1: 5,
+    smelting2: 10,
+    smelting3: 15,
+    smelting4: 20,
+    smelting5: 20,
+    crafting1: 5,
+    crafting2: 10,
+    crafting3: 15,
+    crafting4: 20,
+    crafting5: 20,
   };
+
+  // Bonus-per-level for each Station node (1-indexed by position), mirroring
+  // model.js's STATION_NODES. Used only by the v4 -> v5 migration below to
+  // convert a saved raw multiplier back into a level.
+  const STATION_NODE_BONUS_PER_LEVEL = [0.01, 0.01, 0.01, 0.02, 0.04];
 
   // Bump this whenever a stat key is removed/renamed or an override's shape
   // changes, and add a migration step in normalizeState below. Never change
@@ -47,7 +51,7 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 4;
+  const STORAGE_VERSION = 5;
 
   // Market roll presets, matching what the in-game Market dialog offers.
   const MARKET_OPTIONS = [
@@ -72,6 +76,8 @@
     techMultipliers,
     roomSpeedMultiplier,
     roomIngredientMultiplier,
+    stationNodeBonus,
+    stationCategoryMultiplier,
     effectiveIngredientAmount,
     effectiveSmeltTime,
     formatMoney,
@@ -131,27 +137,27 @@
       salesRoom: 1.45,
       station: 1.04,
       marketingRoom: 1.0,
-      // Station "Smelting"/"Crafting" tech nodes (4 each) and a Manager list,
-      // each an independent multiplicative speed factor not otherwise
-      // modeled — see techMultipliers in model.js. Defaults of 1 mean "no
-      // bonus", same convention as marketingRoom above.
-      smelting1: 1,
-      smelting2: 1,
-      smelting3: 1,
-      smelting4: 1,
-      crafting1: 1,
-      crafting2: 1,
-      crafting3: 1,
-      crafting4: 1,
       managers: [],
-      // Forge/Workshop/Underforge/Dorm Mothership Room levels. Unlike the
-      // multiplier fields above, 0 is a valid, common value here ("haven't
-      // bought this room yet") — see ROOM_LEVEL_KEYS below, which validates
-      // these separately from BONUS_CONTROL_KEYS for exactly that reason.
+      // Forge/Workshop/Underforge/Dorm Mothership Room levels, and Station
+      // "Smelting"/"Crafting" tech-node levels (5 each) — see
+      // techMultipliers/stationCategoryMultiplier in model.js. 0 is a valid,
+      // common value here ("not purchased"/"not researched") — see
+      // LEVEL_CONTROL_KEYS below, which validates these separately from
+      // BONUS_CONTROL_KEYS for exactly that reason.
       forgeLevel: 0,
       workshopLevel: 0,
       underforgeLevel: 0,
       dormLevel: 0,
+      smelting1: 0,
+      smelting2: 0,
+      smelting3: 0,
+      smelting4: 0,
+      smelting5: 0,
+      crafting1: 0,
+      crafting2: 0,
+      crafting3: 0,
+      crafting4: 0,
+      crafting5: 0,
       // Module effects — a 4th open-ended boost source alongside Managers.
       // Unlike Rooms, Modules have no documented level->effect formula (main
       // effects scale unpredictably and sub-effects are randomly rolled per
@@ -235,13 +241,37 @@
       delete incomingControls.stationAlloy;
       delete incomingControls.stationItem;
     }
+    if (!parsed || typeof parsed.version !== "number" || parsed.version < 5) {
+      // v4 -> v5: Station "Smelting"/"Crafting" nodes switched from a
+      // directly-entered raw multiplier per node to a level (0..max), same
+      // convention as Rooms — see LEVEL_CONTROL_KEYS. Best-effort convert a
+      // saved multiplier back into the nearest level via each node's
+      // bonus-per-level (STATION_NODE_BONUS_PER_LEVEL, mirroring model.js's
+      // STATION_NODES) rather than dropping it, so an entered boost isn't
+      // silently lost. There was no node 5 before v5, so it's left for the
+      // v5 default (0) to fill in.
+      ["smelting", "crafting"].forEach((prefix) => {
+        for (let i = 1; i <= 4; i++) {
+          const key = `${prefix}${i}`;
+          const raw = incomingControls[key];
+          if (typeof raw === "number" && isFinite(raw) && raw > 0) {
+            const perLevel = STATION_NODE_BONUS_PER_LEVEL[i - 1];
+            const max = LEVEL_CONTROL_KEYS[key];
+            const level = Math.max(0, Math.min(max, Math.round((raw - 1) / perLevel)));
+            incomingControls[key] = level;
+          } else {
+            delete incomingControls[key];
+          }
+        }
+      });
+    }
     for (const k of BONUS_CONTROL_KEYS) {
       if (!(typeof incomingControls[k] === "number" && isFinite(incomingControls[k]) && incomingControls[k] > 0)) {
         delete incomingControls[k];
       }
     }
 
-    for (const [k, max] of Object.entries(ROOM_LEVEL_KEYS)) {
+    for (const [k, max] of Object.entries(LEVEL_CONTROL_KEYS)) {
       const v = incomingControls[k];
       if (!(typeof v === "number" && isFinite(v) && Number.isInteger(v) && v >= 0 && v <= max)) {
         delete incomingControls[k];
@@ -914,21 +944,32 @@
     ["bonus-marketing-room", "marketingRoom"],
   ];
 
-  // Input id <-> controls key for each Station "Smelting"/"Crafting" node.
-  // Shared by initControls (wiring) and syncControlsUI (post-import resync).
-  // Unlike BONUS_INPUTS these feed techMultipliers (smelt/craft time), not
-  // just price, so their change handler triggers a full renderAll() the same
-  // way TECH_TOGGLES does.
+  // Input id <-> controls key <-> node index (0-4, into model.js's
+  // STATION_NODES) <-> max level, for each Station "Smelting"/"Crafting"
+  // tech node. Shared by initControls (wiring) and syncControlsUI
+  // (post-import resync). Unlike BONUS_INPUTS these feed techMultipliers
+  // (smelt/craft time), not just price, so their change handler triggers a
+  // full renderAll() the same way TECH_TOGGLES does. The per-node hint span
+  // id is derived from the input id; each category also has one
+  // "station-<prefix>-total-hint" span for its combined multiplier (see
+  // stationNodeHint/stationCategoryHint below).
   const SPEED_STATION_INPUTS = [
-    ["bonus-smelting-1", "smelting1"],
-    ["bonus-smelting-2", "smelting2"],
-    ["bonus-smelting-3", "smelting3"],
-    ["bonus-smelting-4", "smelting4"],
-    ["bonus-crafting-1", "crafting1"],
-    ["bonus-crafting-2", "crafting2"],
-    ["bonus-crafting-3", "crafting3"],
-    ["bonus-crafting-4", "crafting4"],
+    ["bonus-smelting-1", "smelting1", 0, 5],
+    ["bonus-smelting-2", "smelting2", 1, 10],
+    ["bonus-smelting-3", "smelting3", 2, 15],
+    ["bonus-smelting-4", "smelting4", 3, 20],
+    ["bonus-smelting-5", "smelting5", 4, 20],
+    ["bonus-crafting-1", "crafting1", 0, 5],
+    ["bonus-crafting-2", "crafting2", 1, 10],
+    ["bonus-crafting-3", "crafting3", 2, 15],
+    ["bonus-crafting-4", "crafting4", 3, 20],
+    ["bonus-crafting-5", "crafting5", 4, 20],
   ];
+
+  // Category prefixes for the Station node groups above — used to recompute
+  // that category's combined-multiplier hint whenever any of its nodes
+  // change (state.controls has `${prefix}1`..`${prefix}5`).
+  const STATION_CATEGORY_PREFIXES = ["smelting", "crafting"];
 
   // Input id <-> controls key <-> formula kind <-> max level, for each
   // Mothership Room whose level feeds techMultipliers. "speed" rooms
@@ -948,6 +989,24 @@
   function roomMultiplierHint(kind, level) {
     const mult = kind === "speed" ? F().roomSpeedMultiplier(level) : F().roomIngredientMultiplier(level);
     return Number(mult.toFixed(2)) + "x";
+  }
+
+  // Formats one Station node's own bonus for its hint span, e.g. "+5%".
+  function stationNodeHint(index, level) {
+    const pct = Math.round(F().stationNodeBonus(index, level) * 100);
+    return `+${pct}%`;
+  }
+
+  // Formats a Station category's (Smelting/Crafting) combined multiplier
+  // across its 5 nodes, e.g. "2.50x". Nodes stack additively within a
+  // category (see stationCategoryMultiplier in model.js).
+  function stationCategoryHint(prefix) {
+    const levels = [1, 2, 3, 4, 5].map((n) => state.controls[`${prefix}${n}`]);
+    return Number(F().stationCategoryMultiplier(levels).toFixed(2)) + "x";
+  }
+
+  function updateStationCategoryHint(prefix) {
+    document.getElementById(`station-${prefix}-total-hint`).textContent = stationCategoryHint(prefix);
   }
 
   // ---- controls ----------------------------------------------------
@@ -1162,22 +1221,28 @@
       });
     }
 
-    for (const [inputId, key] of SPEED_STATION_INPUTS) {
+    for (const [inputId, key, index, max] of SPEED_STATION_INPUTS) {
       const input = document.getElementById(inputId);
+      const hint = document.getElementById(`${inputId}-hint`);
+      const prefix = key.replace(/\d+$/, "");
       input.value = String(state.controls[key]);
+      hint.textContent = stationNodeHint(index, state.controls[key]);
       input.addEventListener("input", () => {
         const raw = input.value.trim();
         const n = Number(raw);
-        const ok = raw !== "" && isFinite(n) && n > 0;
+        const ok = raw !== "" && isFinite(n) && Number.isInteger(n) && n >= 0 && n <= max;
         input.classList.toggle("invalid", !ok);
         if (!ok) return;
         state.controls[key] = n;
+        hint.textContent = stationNodeHint(index, n);
+        updateStationCategoryHint(prefix);
         saveState();
         // Station nodes change the stat table's effective smelt/craft time,
         // not just price, so this needs the full re-render (like TECH_TOGGLES).
         renderAll();
       });
     }
+    for (const prefix of STATION_CATEGORY_PREFIXES) updateStationCategoryHint(prefix);
 
     for (const [inputId, key, kind, max] of ROOM_LEVEL_INPUTS) {
       const input = document.getElementById(inputId);
@@ -1311,9 +1376,11 @@
     for (const [inputId, key] of BONUS_INPUTS) {
       document.getElementById(inputId).value = String(state.controls[key]);
     }
-    for (const [inputId, key] of SPEED_STATION_INPUTS) {
+    for (const [inputId, key, index] of SPEED_STATION_INPUTS) {
       document.getElementById(inputId).value = String(state.controls[key]);
+      document.getElementById(`${inputId}-hint`).textContent = stationNodeHint(index, state.controls[key]);
     }
+    for (const prefix of STATION_CATEGORY_PREFIXES) updateStationCategoryHint(prefix);
     for (const [inputId, key, kind] of ROOM_LEVEL_INPUTS) {
       document.getElementById(inputId).value = String(state.controls[key]);
       document.getElementById(inputId.replace("-level", "-hint")).textContent = roomMultiplierHint(

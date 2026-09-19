@@ -133,7 +133,9 @@
         Mothership Rooms, Station tech nodes, Managers, and Module effects
         that boost smelter/crafter speed, reduce ingredient costs, or (for
         Module effects) boost alloy/item sell value, on top of the
-        Researched tech above. 1 = no bonus.
+        Researched tech above. Enter the level you've purchased for each
+        Room/Station node (0 = not purchased); the hint next to it shows the
+        resulting bonus.
       </p>
 
       <h3>Rooms</h3>
@@ -161,38 +163,60 @@
       </div>
 
       <h3>Station nodes</h3>
+      <p class="card-sub">
+        Smelting total: <span class="control-hint" id="station-smelting-total-hint"></span>
+        &nbsp;·&nbsp; Crafting total: <span class="control-hint" id="station-crafting-total-hint"></span>
+      </p>
       <div class="bonus-grid">
         <div class="control-group">
-          <label class="control-label" for="bonus-smelting-1">Smelting 1</label>
-          <input type="number" id="bonus-smelting-1" min="0" step="any" />
+          <label class="control-label" for="bonus-smelting-1">Smelting 1 level</label>
+          <input type="number" id="bonus-smelting-1" min="0" max="5" step="1" />
+          <span class="control-hint" id="bonus-smelting-1-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-smelting-2">Smelting 2</label>
-          <input type="number" id="bonus-smelting-2" min="0" step="any" />
+          <label class="control-label" for="bonus-smelting-2">Smelting 2 level</label>
+          <input type="number" id="bonus-smelting-2" min="0" max="10" step="1" />
+          <span class="control-hint" id="bonus-smelting-2-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-smelting-3">Smelting 3</label>
-          <input type="number" id="bonus-smelting-3" min="0" step="any" />
+          <label class="control-label" for="bonus-smelting-3">Smelting 3 level</label>
+          <input type="number" id="bonus-smelting-3" min="0" max="15" step="1" />
+          <span class="control-hint" id="bonus-smelting-3-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-smelting-4">Smelting 4</label>
-          <input type="number" id="bonus-smelting-4" min="0" step="any" />
+          <label class="control-label" for="bonus-smelting-4">Smelting 4 level</label>
+          <input type="number" id="bonus-smelting-4" min="0" max="20" step="1" />
+          <span class="control-hint" id="bonus-smelting-4-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-crafting-1">Crafting 1</label>
-          <input type="number" id="bonus-crafting-1" min="0" step="any" />
+          <label class="control-label" for="bonus-smelting-5">Smelting 5 level</label>
+          <input type="number" id="bonus-smelting-5" min="0" max="20" step="1" />
+          <span class="control-hint" id="bonus-smelting-5-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-crafting-2">Crafting 2</label>
-          <input type="number" id="bonus-crafting-2" min="0" step="any" />
+          <label class="control-label" for="bonus-crafting-1">Crafting 1 level</label>
+          <input type="number" id="bonus-crafting-1" min="0" max="5" step="1" />
+          <span class="control-hint" id="bonus-crafting-1-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-crafting-3">Crafting 3</label>
-          <input type="number" id="bonus-crafting-3" min="0" step="any" />
+          <label class="control-label" for="bonus-crafting-2">Crafting 2 level</label>
+          <input type="number" id="bonus-crafting-2" min="0" max="10" step="1" />
+          <span class="control-hint" id="bonus-crafting-2-hint"></span>
         </div>
         <div class="control-group">
-          <label class="control-label" for="bonus-crafting-4">Crafting 4</label>
-          <input type="number" id="bonus-crafting-4" min="0" step="any" />
+          <label class="control-label" for="bonus-crafting-3">Crafting 3 level</label>
+          <input type="number" id="bonus-crafting-3" min="0" max="15" step="1" />
+          <span class="control-hint" id="bonus-crafting-3-hint"></span>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-crafting-4">Crafting 4 level</label>
+          <input type="number" id="bonus-crafting-4" min="0" max="20" step="1" />
+          <span class="control-hint" id="bonus-crafting-4-hint"></span>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="bonus-crafting-5">Crafting 5 level</label>
+          <input type="number" id="bonus-crafting-5" min="0" max="20" step="1" />
+          <span class="control-hint" id="bonus-crafting-5-hint"></span>
         </div>
       </div>
 
@@ -321,7 +345,7 @@
        file's own caching, so a freshly-loaded page never runs stale JS/CSS
        against fresh markup. Bump v on any deploy touching these 4 files. -->
   <script src="data.js?v=2"></script>
-  <script src="model.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="model.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
