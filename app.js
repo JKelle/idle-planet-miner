@@ -152,6 +152,14 @@
       workshopLevel: 0,
       underforgeLevel: 0,
       dormLevel: 0,
+      // Module effects — a 4th open-ended boost source alongside Managers.
+      // Unlike Rooms, Modules have no documented level->effect formula (main
+      // effects scale unpredictably and sub-effects are randomly rolled per
+      // the wiki), so the player enters each effect directly, same shape as
+      // managers but with a wider category enum since a single Module can
+      // affect speed, ingredient cost, or sell value. See
+      // moduleEffectMultiplier in model.js.
+      moduleEffects: [],
     };
   }
 
@@ -261,6 +269,35 @@
       cleanManagers.push({ id, name, boostType, boostAmount });
     }
     incomingControls.managers = cleanManagers;
+
+    // Module effects: same array-of-entries shape and validation approach as
+    // Managers above, but with a wider category enum (a single Module can
+    // affect speed, ingredient cost, or sell value, not just smelt/craft
+    // speed) — see moduleEffectMultiplier in model.js.
+    const rawModuleEffects = Array.isArray(incomingControls.moduleEffects) ? incomingControls.moduleEffects : [];
+    const seenModuleEffectIds = new Set();
+    const cleanModuleEffects = [];
+    const MODULE_EFFECT_CATEGORIES = [
+      "none",
+      "smeltSpeed",
+      "craftSpeed",
+      "alloyIngredient",
+      "itemIngredient",
+      "alloyValue",
+      "itemValue",
+    ];
+    for (const e of rawModuleEffects) {
+      if (!e || typeof e !== "object") continue;
+      const category = MODULE_EFFECT_CATEGORIES.includes(e.category) ? e.category : "none";
+      const amount =
+        typeof e.amount === "number" && isFinite(e.amount) && e.amount > 0 ? e.amount : 1;
+      const name = typeof e.name === "string" ? e.name : "";
+      let id = typeof e.id === "string" && e.id && !seenModuleEffectIds.has(e.id) ? e.id : null;
+      if (!id) id = "e" + Math.random().toString(36).slice(2, 10);
+      seenModuleEffectIds.add(id);
+      cleanModuleEffects.push({ id, name, category, amount });
+    }
+    incomingControls.moduleEffects = cleanModuleEffects;
 
     return {
       version: STORAGE_VERSION,
@@ -992,6 +1029,96 @@
     }
   }
 
+  // Category id <-> label for the Module-effect dropdown. Wider than
+  // Managers' 3-value enum since a single Module effect can land in any of
+  // the 6 categories this app tracks (speed, ingredient cost, or sell
+  // value) — see moduleEffectMultiplier in model.js. An effect touching
+  // more than one category (a Module's "main effect" commonly boosts both
+  // smelt and craft speed at once) needs one row per category.
+  const MODULE_EFFECT_CATEGORY_LABELS = [
+    ["none", "No effect"],
+    ["smeltSpeed", "Smelt speed"],
+    ["craftSpeed", "Craft speed"],
+    ["alloyIngredient", "Alloy ingredient cost"],
+    ["itemIngredient", "Item ingredient cost"],
+    ["alloyValue", "Alloy sell value"],
+    ["itemValue", "Item sell value"],
+  ];
+
+  // Rebuilds the #module-effects-list rows from state.controls.moduleEffects.
+  // Structurally identical to renderManagersList above (reuses the same
+  // .manager-row/.manager-remove styling — these are the same kind of
+  // "player-entered, open-ended list" row, just with more category options.
+  function renderModuleEffectsList() {
+    const container = document.getElementById("module-effects-list");
+    container.innerHTML = "";
+    for (const e of state.controls.moduleEffects) {
+      const row = document.createElement("div");
+      row.className = "manager-row";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.value = e.name;
+      nameInput.placeholder = "Module / effect name";
+      nameInput.setAttribute("aria-label", "Module effect name");
+      nameInput.addEventListener("input", () => {
+        e.name = nameInput.value;
+        saveState();
+      });
+
+      const categorySelect = document.createElement("select");
+      for (const [value, label] of MODULE_EFFECT_CATEGORY_LABELS) {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        if (e.category === value) opt.selected = true;
+        categorySelect.appendChild(opt);
+      }
+      categorySelect.setAttribute("aria-label", `${e.name || "Module effect"} category`);
+
+      const amountInput = document.createElement("input");
+      amountInput.type = "number";
+      amountInput.min = "0";
+      amountInput.step = "any";
+      amountInput.value = String(e.amount);
+      amountInput.disabled = e.category === "none";
+      amountInput.setAttribute("aria-label", `${e.name || "Module effect"} amount`);
+
+      categorySelect.addEventListener("change", () => {
+        e.category = categorySelect.value;
+        amountInput.disabled = e.category === "none";
+        saveState();
+        renderAll();
+      });
+
+      amountInput.addEventListener("input", () => {
+        const raw = amountInput.value.trim();
+        const n = Number(raw);
+        const ok = raw !== "" && isFinite(n) && n > 0;
+        amountInput.classList.toggle("invalid", !ok);
+        if (!ok) return;
+        e.amount = n;
+        saveState();
+        renderAll();
+      });
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "manager-remove";
+      removeBtn.textContent = "×";
+      removeBtn.setAttribute("aria-label", `Remove ${e.name || "module effect"}`);
+      removeBtn.addEventListener("click", () => {
+        state.controls.moduleEffects = state.controls.moduleEffects.filter((x) => x.id !== e.id);
+        saveState();
+        renderModuleEffectsList();
+        renderAll();
+      });
+
+      row.append(nameInput, categorySelect, amountInput, removeBtn);
+      container.appendChild(row);
+    }
+  }
+
   function initControls() {
     segmented("scale-control", "scale");
     segmented("category-control", "category");
@@ -1080,6 +1207,18 @@
       renderManagersList();
     });
     renderManagersList();
+
+    document.getElementById("add-module-effect-btn").addEventListener("click", () => {
+      state.controls.moduleEffects.push({
+        id: "e" + Math.random().toString(36).slice(2, 10),
+        name: "",
+        category: "none",
+        amount: 1,
+      });
+      saveState();
+      renderModuleEffectsList();
+    });
+    renderModuleEffectsList();
 
     document.getElementById("reset-all").addEventListener("click", () => {
       if (!confirm("Reset every stat and unlock back to the game defaults?")) return;
@@ -1180,6 +1319,7 @@
       );
     }
     renderManagersList();
+    renderModuleEffectsList();
   }
 
   function segmented(containerId, controlKey) {

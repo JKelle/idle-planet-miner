@@ -130,8 +130,9 @@
     <section class="card speed-card" aria-label="Smelt/craft speed & ingredient bonuses">
       <h2>Smelt/craft speed & ingredient bonuses</h2>
       <p class="card-sub">
-        Mothership Rooms, Station tech nodes, and Managers that boost
-        smelter/crafter speed or reduce ingredient costs, on top of the
+        Mothership Rooms, Station tech nodes, Managers, and Module effects
+        that boost smelter/crafter speed, reduce ingredient costs, or (for
+        Module effects) boost alloy/item sell value, on top of the
         Researched tech above. 1 = no bonus.
       </p>
 
@@ -198,6 +199,17 @@
       <h3>Managers</h3>
       <div id="managers-list"></div>
       <button type="button" id="add-manager-btn" class="btn-secondary">+ Add manager</button>
+
+      <h3>Modules</h3>
+      <p class="card-sub">
+        Modules have no fixed level formula (main effects scale
+        unpredictably; sub-effects are randomly rolled), so enter each
+        effect's current value directly. An effect that boosts more than one
+        category (e.g. a module's main effect often boosts both smelt and
+        craft speed) needs one row per category.
+      </p>
+      <div id="module-effects-list"></div>
+      <button type="button" id="add-module-effect-btn" class="btn-secondary">+ Add module effect</button>
     </section>
 
     <section class="card bonuses-card" aria-label="Sell price bonuses">
@@ -309,7 +321,7 @@
        file's own caching, so a freshly-loaded page never runs stale JS/CSS
        against fresh markup. Bump v on any deploy touching these 4 files. -->
   <script src="data.js?v=2"></script>
-  <script src="model.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="model.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

@@ -19,12 +19,32 @@ function sellPrice(entity) {
   return entity.sellPrice;
 }
 
+// Combined multiplier from every Module-effect row tagged with `category`.
+// Modules (a distinct in-game system from Mothership Rooms) have no
+// documented level->effect formula — per the wiki, main effects scale
+// unpredictably and sub-effects are randomly rolled per module from a large
+// pool — so unlike Rooms, the player enters each effect's current value
+// directly, the same convention already established for Managers. Multiple
+// rows in the same category multiply together. A single module effect that
+// touches more than one category (e.g. a "main effect" boosting both smelt
+// and craft speed at once) is entered as one row per category.
+function moduleEffectMultiplier(controls, category) {
+  const effects = controls && Array.isArray(controls.moduleEffects) ? controls.moduleEffects : [];
+  let mult = 1;
+  for (const e of effects) {
+    if (!e || e.category !== category) continue;
+    const amt = typeof e.amount === "number" && isFinite(e.amount) && e.amount > 0 ? e.amount : 1;
+    mult *= amt;
+  }
+  return mult;
+}
+
 // Multiplicative decomposition of a sellable's price, mirroring profit.py's
-// get_sell_price. Ores get no sales-room, station-value, or value-project
-// bonus — those are alloy/item-only in-game. Alloys and items share a single
-// station-value control since they always move together in-game. The
-// Marketing room scales positive market boosts only (a x3 market at
-// Marketing 2.50 sells for x7.5); a glut market (< 1) is never scaled.
+// get_sell_price. Ores get no sales-room, station-value, value-project, or
+// Module-value bonus — those are alloy/item-only in-game. Alloys and items
+// share a single station-value control since they always move together in
+// -game. The Marketing room scales positive market boosts only (a x3 market
+// at Marketing 2.50 sells for x7.5); a glut market (< 1) is never scaled.
 function sellPriceParts(entity, controls) {
   const base = entity.basePrice;
   const star = 1 + 0.2 * entity.stars;
@@ -41,11 +61,15 @@ function sellPriceParts(entity, controls) {
 
   const sales = isOre ? 1 : controls.salesRoom;
 
+  const moduleValue = isOre
+    ? 1
+    : moduleEffectMultiplier(controls, entity.category === "alloy" ? "alloyValue" : "itemValue");
+
   const rawMarket = typeof entity.market === "number" ? entity.market : 1;
   const market = rawMarket > 1 ? rawMarket * controls.marketingRoom : rawMarket;
 
-  const effective = base * star * tech * station * sales * market;
-  return { base, star, tech, station, sales, market, effective };
+  const effective = base * star * tech * station * sales * moduleValue * market;
+  return { base, star, tech, station, sales, moduleValue, market, effective };
 }
 
 // Recursive raw-ore cost of an entity's ingredients. Non-ore ingredients
@@ -107,20 +131,24 @@ function roomIngredientMultiplier(level) {
   return lvl === 0 ? 1 : 0.9 - 0.04 * (lvl - 1);
 }
 
-// Research-project, Mothership-Room, Station-node, and Manager multipliers
-// for smelters (alloys) and crafting stations (items), keyed by category,
-// expressed so that effective = base * mult. Ores have no entry (no craft
-// time, no ingredients) — callers treat a missing category as the identity
-// multiplier. Value-project bonuses (Advanced/Superior Alloy/Item Value) are
-// handled separately by sellPriceParts, since they apply to items too.
+// Research-project, Mothership-Room, Station-node, Manager, and Module
+// multipliers for smelters (alloys) and crafting stations (items), keyed by
+// category, expressed so that effective = base * mult. Ores have no entry
+// (no craft time, no ingredients) — callers treat a missing category as the
+// identity multiplier. Value-project bonuses (Advanced/Superior Alloy/Item
+// Value) are handled separately by sellPriceParts, since they apply to
+// items too.
 //
 // Station "Smelting"/"Crafting" tech nodes (4 each), the Forge/Workshop/
-// Underforge/Dorm Mothership Rooms, and an open-ended list of Managers are
-// additional real-game sources not modeled by a research toggle: each
-// Station node is its own independent multiplicative factor, each Room's
-// level maps to a multiplier via the formulas above, and each Manager
-// optionally boosts either smelt or craft speed (never both) by its own
-// factor. All sources for a category combine by straight multiplication.
+// Underforge/Dorm Mothership Rooms, an open-ended list of Managers, and an
+// open-ended list of Module effects are additional real-game sources not
+// modeled by a research toggle: each Station node is its own independent
+// multiplicative factor, each Room's level maps to a multiplier via the
+// formulas above, each Manager optionally boosts either smelt or craft
+// speed (never both) by its own factor, and each Module-effect row
+// (see moduleEffectMultiplier) does the same for whichever single category
+// it's tagged with. All sources for a category combine by straight
+// multiplication.
 function techMultipliers(controls) {
   const on = (k) => (controls && controls[k] ? 1 : 0);
   const num = (k) => (controls && typeof controls[k] === "number" ? controls[k] : 1);
@@ -149,20 +177,22 @@ function techMultipliers(controls) {
     Math.pow(1.2, on("techAdvancedFurnace") + on("techSuperiorFurnace")) *
     stationSmeltMult *
     managerSmeltMult *
-    forgeMult;
+    forgeMult *
+    moduleEffectMultiplier(controls, "smeltSpeed");
   const crafterSpeed =
     Math.pow(1.2, on("techAdvancedCrafting") + on("techSuperiorCrafting")) *
     stationCraftMult *
     managerCraftMult *
-    workshopMult;
+    workshopMult *
+    moduleEffectMultiplier(controls, "craftSpeed");
   return {
     alloy: {
       smeltTimeSeconds: 1 / smelterSpeed,
-      ingredient: (on("techSmeltingEfficiency") ? 0.8 : 1) * underforgeMult,
+      ingredient: (on("techSmeltingEfficiency") ? 0.8 : 1) * underforgeMult * moduleEffectMultiplier(controls, "alloyIngredient"),
     },
     item: {
       smeltTimeSeconds: 1 / crafterSpeed,
-      ingredient: (on("techCraftingEfficiency") ? 0.8 : 1) * dormMult,
+      ingredient: (on("techCraftingEfficiency") ? 0.8 : 1) * dormMult * moduleEffectMultiplier(controls, "itemIngredient"),
     },
   };
 }
@@ -304,6 +334,7 @@ if (typeof module !== "undefined" && module.exports) {
     techMultipliers,
     roomSpeedMultiplier,
     roomIngredientMultiplier,
+    moduleEffectMultiplier,
     roundHalfEven,
     effectiveIngredientAmount,
     effectiveSmeltTime,
