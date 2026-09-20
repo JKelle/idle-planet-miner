@@ -591,6 +591,19 @@
     saveState();
   }
 
+  // Market rolls change every few hours in-game, so clearing them one row at a
+  // time is this tool's most-repeated chore. Deleting the key (rather than
+  // writing 1) puts each entity back on resolved()'s implicit default and keeps
+  // the override layer sparse; an override left empty is pruned, matching what
+  // normalizeState does on load.
+  function resetMarkets() {
+    for (const [id, ov] of Object.entries(state.overrides)) {
+      delete ov.market;
+      if (!Object.keys(ov).length) delete state.overrides[id];
+    }
+    saveState();
+  }
+
   // ---- computed rows ----------------------------------------------------
   function computeRows() {
     const byId = effectiveMap();
@@ -1531,6 +1544,11 @@
     document.getElementById("reset-all").addEventListener("click", () => {
       if (!confirm("Reset every stat and unlock back to the game defaults?")) return;
       resetAll();
+      renderAll();
+    });
+
+    document.getElementById("reset-markets").addEventListener("click", () => {
+      resetMarkets();
       renderAll();
     });
 
