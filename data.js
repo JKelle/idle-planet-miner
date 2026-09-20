@@ -20,6 +20,14 @@
  * never paste an already-boosted in-game number in here, or the reduction
  * gets applied twice.
  *
+ * `smeltTimeSeconds` is likewise the game's fixed **base** smelt/craft time
+ * (per the wiki), before any speed boost. The Advanced/Superior Furnace and
+ * Crafter projects, the Forge/Workshop Mothership Rooms, Station
+ * Smelting/Crafting nodes, Managers, and Module speed effects are all
+ * applied on top of this at runtime by model.js's techMultipliers — never
+ * paste an already-boosted in-game time in here, or the speedup gets
+ * applied twice.
+ *
  * Do not mutate these objects at runtime — user edits live in a separate
  * overrides layer (see app.js).
  */

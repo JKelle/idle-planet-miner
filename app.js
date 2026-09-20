@@ -61,7 +61,7 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 7;
+  const STORAGE_VERSION = 8;
 
   // Market roll presets, matching what the in-game Market dialog offers.
   const MARKET_OPTIONS = [
@@ -220,11 +220,20 @@
     // the reduction once techMultipliers layers the modeled boosts on top.
     const preV6 = !parsed || typeof parsed.version !== "number" || parsed.version < 6;
 
+    // v7 -> v8: data.js's base smelt/craft times were corrected to the
+    // game's true base values (19cf3e4), but a saved smeltTimeSeconds
+    // override still has the player's own boosted in-game time baked in —
+    // it can't be un-baked, so like the ingredient drop above it's dropped
+    // rather than migrated: keeping it would silently double-apply the
+    // Station/Manager/Forge/Workshop/Module speed boosts now modeled on top.
+    const preV8 = !parsed || typeof parsed.version !== "number" || parsed.version < 8;
+
     const clean = {};
     for (const [id, ov] of Object.entries(overrides)) {
       if (!ov || typeof ov !== "object") continue;
       const entry = {};
       for (const k of STAT_KEYS) {
+        if (preV8 && k === "smeltTimeSeconds") continue;
         if (typeof ov[k] === "number" && isFinite(ov[k]) && ov[k] >= 0) {
           entry[k] = ov[k];
         }
