@@ -754,6 +754,9 @@
       if (!unlocked) tr.className = "locked";
 
       const tdOn = cell(tr);
+      tdOn.className = "unlock-cell";
+      const cbLabel = document.createElement("label");
+      cbLabel.className = "unlock-toggle";
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = unlocked;
@@ -762,7 +765,8 @@
         setUnlocked(base.id, cb.checked);
         renderAll();
       });
-      tdOn.appendChild(cb);
+      cbLabel.appendChild(cb);
+      tdOn.appendChild(cbLabel);
 
       const tdName = cell(tr);
       tdName.className = "col-name";

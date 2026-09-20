@@ -479,6 +479,7 @@ select {
 .stat-table th:nth-child(1),
 .stat-table td:nth-child(1) {
   width: 44px;
+  text-align: center;
 }
 
 .stat-table th:nth-child(2),
@@ -537,13 +538,34 @@ select {
   color: var(--text-soft);
 }
 
-.stat-table input {
+.stat-table input:not([type="checkbox"]) {
   font: inherit;
   width: 68px;
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   text-align: right;
+}
+
+/* The whole "On" cell is the click target — a bare 13px checkbox is an
+ * awkward thing to hit in a dense table. */
+.stat-table .unlock-cell {
+  padding: 0;
+}
+
+.stat-table .unlock-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.stat-table .unlock-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
 }
 
 /* Wraps a raw stat field and, when a researched tech applies, its linked
