@@ -1076,9 +1076,18 @@
     { prefix: "value", label: "Value", maxLevels: [5, 5, 5, 4, 4, 2, 2], priceOnly: true },
   ];
 
-  // Formats a Room level's computed multiplier for its hint span, e.g. "2.10x".
+  // Formats a Room level's computed effect for its hint span. Ingredient
+  // rooms (Underforge/Dorm) show a discount ("-30%"), matching how the game
+  // itself displays them, even though the underlying multiplier (consumed by
+  // sellPriceParts/techMultipliers) is unchanged. Every other kind keeps the
+  // multiplier display, e.g. "2.10x".
   function roomMultiplierHint(kind, level) {
-    return Number(F().roomMultiplier(kind, level).toFixed(2)) + "x";
+    const mult = F().roomMultiplier(kind, level);
+    if (kind === "ingredient") {
+      const pct = Math.round((1 - mult) * 100);
+      return pct === 0 ? "0%" : `-${pct}%`;
+    }
+    return Number(mult.toFixed(2)) + "x";
   }
 
   // Formats one Station node's own bonus for its hint span, e.g. "+5%".
