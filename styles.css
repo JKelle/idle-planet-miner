@@ -468,8 +468,8 @@ select {
   width: 100%;
   /* Widened for the time/ingredients columns, which need room for a raw
    * field plus a linked "effective" field when a researched tech changes an
-   * alloy's numbers (see .eff-arrow/.eff-input), plus the four price columns
-   * (base price, stars, market, sell price). */
+   * alloy's numbers (see .eff-arrow/.eff-input), plus the stars/base
+   * price/market/sell price columns. */
   min-width: 1150px;
   table-layout: fixed;
   border-collapse: collapse;
@@ -489,22 +489,22 @@ select {
 
 .stat-table th:nth-child(3),
 .stat-table td:nth-child(3) {
-  width: 170px;
+  width: 70px;
 }
 
 .stat-table th:nth-child(4),
 .stat-table td:nth-child(4) {
-  width: 300px;
+  width: 170px;
 }
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 110px;
+  width: 300px;
 }
 
 .stat-table th:nth-child(6),
 .stat-table td:nth-child(6) {
-  width: 70px;
+  width: 110px;
 }
 
 .stat-table th:nth-child(7),

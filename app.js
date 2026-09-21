@@ -773,6 +773,8 @@
       tdName.appendChild(entityIcon(base.id));
       tdName.appendChild(document.createTextNode(" " + base.name));
 
+      renderStarsCell(tr, e, base.id);
+
       if (isOre) {
         cell(tr); // time — not applicable to ores
         cell(tr); // ingredients — not applicable to ores
@@ -885,16 +887,11 @@
     td.appendChild(wrap);
   }
 
-  // Renders the four price cells: read-only base price, editable stars,
-  // editable market roll, and read-only effective sell price (the product of
-  // basePrice, stars, market, and the global bonus controls — see
-  // sellPriceParts in model.js). Only stars/market are per-entity; the rest
-  // come from the "Sell price bonuses" card and apply across every row.
-  function renderPriceCells(tr, entity, id) {
-    const tdBase = cell(tr);
-    tdBase.className = "price-readonly";
-    tdBase.textContent = F().formatMoney(entity.basePrice);
-
+  // Renders the editable stars cell, placed right next to the entity name so
+  // it stays on screen together with the row it belongs to (see
+  // renderStatTable). Stars is one of the inputs to sellPrice, computed in
+  // renderPriceCells below along with the other price cells.
+  function renderStarsCell(tr, entity, id) {
     const tdStars = cell(tr);
     const starsInput = document.createElement("input");
     starsInput.type = "number";
@@ -919,6 +916,18 @@
       focusNextStarsInput(starsInput);
     });
     tdStars.appendChild(starsInput);
+  }
+
+  // Renders the three remaining price cells: read-only base price, editable
+  // market roll, and read-only effective sell price (the product of
+  // basePrice, stars, market, and the global bonus controls — see
+  // sellPriceParts in model.js). Only market is per-entity here (stars is
+  // rendered separately by renderStarsCell); the rest come from the "Sell
+  // price bonuses" card and apply across every row.
+  function renderPriceCells(tr, entity, id) {
+    const tdBase = cell(tr);
+    tdBase.className = "price-readonly";
+    tdBase.textContent = F().formatMoney(entity.basePrice);
 
     const tdMarket = cell(tr);
     const marketSelect = document.createElement("select");
