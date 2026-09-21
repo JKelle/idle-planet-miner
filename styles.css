@@ -470,7 +470,7 @@ select {
    * field plus a linked "effective" field when a researched tech changes an
    * alloy's numbers (see .eff-arrow/.eff-input), plus the stars/base
    * price/market/sell price columns. */
-  min-width: 1150px;
+  min-width: 1204px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-sm);
@@ -489,7 +489,8 @@ select {
 
 .stat-table th:nth-child(3),
 .stat-table td:nth-child(3) {
-  width: 70px;
+  width: 124px;
+  text-align: center;
 }
 
 .stat-table th:nth-child(4),
@@ -547,6 +548,65 @@ select {
   text-align: right;
 }
 
+/* Stars is edited primarily via the +/- buttons, so the number itself is
+ * borderless at rest (reads as a display value, not a field) and only gains
+ * a border on focus, when typing becomes the active path. */
+.stars-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* "input.stars-input", not just ".stars-input", to outrank the generic
+ * ".stat-table input:not([type=checkbox])" rule above (same specificity,
+ * later in the file) — that rule's plain-class form loses the tie. */
+.stat-table input.stars-input {
+  width: 36px;
+  text-align: center;
+  border-color: transparent;
+  background: transparent;
+}
+
+.stat-table input.stars-input:focus {
+  border-color: var(--border);
+}
+
+/* Native spinner arrows would be redundant next to .stars-step and don't
+ * fit the narrow field; keyboard up/down arrows still work without them. */
+.stars-input {
+  appearance: textfield;
+}
+
+.stars-input::-webkit-inner-spin-button,
+.stars-input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.stars-step {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-soft);
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.stars-step:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.stars-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* The whole "On" cell is the click target — a bare 13px checkbox is an
  * awkward thing to hit in a dense table. */
 .stat-table .unlock-cell {
@@ -601,6 +661,14 @@ select {
 }
 
 input.invalid {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* Restated as "input.stars-input.invalid" to match the specificity of (and,
+ * by appearing later, win the tie against) ".stat-table input.stars-input:focus"
+ * above — otherwise an invalid value in a focused field loses its red border. */
+.stat-table input.stars-input.invalid {
   border-color: var(--danger);
   background: var(--danger-bg);
 }

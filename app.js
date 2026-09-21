@@ -891,31 +891,123 @@
   // it stays on screen together with the row it belongs to (see
   // renderStatTable). Stars is one of the inputs to sellPrice, computed in
   // renderPriceCells below along with the other price cells.
+  //
+  // The primary way to edit stars is the +/- stepper (hold to auto-repeat);
+  // the number itself stays a real input so typing/Enter-to-next-row still
+  // work as a secondary path. See focusNextStarsInput below, which depends
+  // on the "stars-input" class staying on that field.
   function renderStarsCell(tr, entity, id) {
     const tdStars = cell(tr);
+    const wrap = document.createElement("span");
+    wrap.className = "stars-stepper";
+
+    const minusBtn = document.createElement("button");
+    minusBtn.type = "button";
+    minusBtn.className = "stars-step";
+    minusBtn.textContent = "−";
+    minusBtn.setAttribute("aria-label", `Decrease ${entity.name} stars`);
+
     const starsInput = document.createElement("input");
     starsInput.type = "number";
     starsInput.min = "0";
     starsInput.step = "1";
+    starsInput.inputMode = "numeric";
     starsInput.className = "stars-input";
     starsInput.value = String(entity.stars);
     starsInput.setAttribute("aria-label", `${entity.name} stars`);
+
+    const plusBtn = document.createElement("button");
+    plusBtn.type = "button";
+    plusBtn.className = "stars-step";
+    plusBtn.textContent = "+";
+    plusBtn.setAttribute("aria-label", `Increase ${entity.name} stars`);
+
+    // Renders during a hold only touch the current row (cheap); the chart —
+    // a full recompute across all entities plus a Chart.js destroy/rebuild
+    // (see renderChart) — is deferred until the hold ends so a fast repeat
+    // doesn't janks it every tick.
+    function commit(n, { deferChart } = {}) {
+      starsInput.value = String(n);
+      minusBtn.disabled = n <= 0;
+      setStat(id, "stars", n);
+      updateEffectivePriceCell(id);
+      if (deferChart) return;
+      renderChart();
+    }
+
+    starsInput.addEventListener("focus", () => starsInput.select());
     starsInput.addEventListener("input", () => {
       const raw = starsInput.value.trim();
       const n = Number(raw);
       const ok = raw !== "" && isFinite(n) && n >= 0 && Number.isInteger(n);
       starsInput.classList.toggle("invalid", !ok);
       if (!ok) return;
-      setStat(id, "stars", n);
-      updateEffectivePriceCell(id);
-      renderChart();
+      commit(n);
     });
     starsInput.addEventListener("keydown", (ev) => {
       if (ev.key !== "Enter") return;
       ev.preventDefault();
       focusNextStarsInput(starsInput);
     });
-    tdStars.appendChild(starsInput);
+
+    // Press-and-hold auto-repeat: one immediate step on press, then repeats
+    // after a short delay, accelerating after ~1s. Pointer capture keeps the
+    // hold alive (and endable) even if the finger/cursor slides off the
+    // button.
+    function bindStep(btn, delta) {
+      let timeoutId = null;
+      let intervalId = null;
+      function step() {
+        const current = Number(starsInput.value) || 0;
+        const next = Math.max(0, current + delta);
+        if (next !== current) commit(next, { deferChart: true });
+      }
+      let active = false;
+      function stop() {
+        clearTimeout(timeoutId);
+        clearInterval(intervalId);
+        timeoutId = null;
+        intervalId = null;
+        // Guards against a spurious render on e.g. tabbing focus off the
+        // button without ever pressing it (blur fires with nothing pending).
+        if (!active) return;
+        active = false;
+        renderChart();
+      }
+      btn.addEventListener("pointerdown", (ev) => {
+        if (btn.disabled) return;
+        active = true;
+        // Best-effort: keeps the hold going if the pointer slides off the
+        // button. Not critical — swallow so a capture failure never blocks
+        // the step below.
+        try {
+          btn.setPointerCapture(ev.pointerId);
+        } catch (e) {
+          /* ignore */
+        }
+        step();
+        timeoutId = setTimeout(() => {
+          intervalId = setInterval(step, 160);
+          timeoutId = setTimeout(() => {
+            clearInterval(intervalId);
+            intervalId = setInterval(step, 50);
+          }, 1000);
+        }, 500);
+      });
+      btn.addEventListener("pointerup", stop);
+      btn.addEventListener("pointercancel", stop);
+      btn.addEventListener("lostpointercapture", stop);
+      btn.addEventListener("blur", stop);
+    }
+    bindStep(minusBtn, -1);
+    bindStep(plusBtn, 1);
+
+    minusBtn.disabled = entity.stars <= 0;
+
+    wrap.appendChild(minusBtn);
+    wrap.appendChild(starsInput);
+    wrap.appendChild(plusBtn);
+    tdStars.appendChild(wrap);
   }
 
   // Renders the three remaining price cells: read-only base price, editable
