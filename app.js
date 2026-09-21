@@ -604,6 +604,25 @@
     saveState();
   }
 
+  // Per-value reset for the stat tables. Like resetMarkets, these delete the
+  // key rather than writing the default back, and prune what they empty.
+  function clearStat(id, key) {
+    const ov = state.overrides[id];
+    if (!ov) return;
+    delete ov[key];
+    if (!Object.keys(ov).length) delete state.overrides[id];
+    saveState();
+  }
+
+  function clearIngredientAmount(id, sellableId) {
+    const ov = state.overrides[id];
+    if (!ov || !ov.ingredients) return;
+    delete ov.ingredients[sellableId];
+    if (!Object.keys(ov.ingredients).length) delete ov.ingredients;
+    if (!Object.keys(ov).length) delete state.overrides[id];
+    saveState();
+  }
+
   // ---- computed rows ----------------------------------------------------
   function computeRows() {
     const byId = effectiveMap();
@@ -813,9 +832,34 @@
     return img;
   }
 
-  // `mult` is the researched-tech multiplier for this stat (1 = no effect).
-  // When it isn't 1, a second "effective" field is shown alongside the raw
-  // one the player edits — either can be typed into, and they stay linked.
+  // The revert button shown next to a derived value the player has overridden.
+  // Its slot is always reserved (visibility, not display) so toggling it never
+  // shifts the row. syncOverrideUI labels it with the value it restores so the
+  // player sees what they get back before clicking.
+  function resetButton() {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "stat-reset";
+    btn.textContent = "↺";
+    return btn;
+  }
+
+  // Keeps an input's orange styling and its revert button in step with whether
+  // the player's stored value now yields a different effective number than the
+  // default would.
+  function syncOverrideUI(input, btn, overridden, restoreText, ariaPrefix) {
+    input.classList.toggle("overridden", overridden);
+    btn.classList.toggle("shown", overridden);
+    btn.tabIndex = overridden ? 0 : -1;
+    btn.title = overridden ? `Reset to ${restoreText}` : "";
+    btn.setAttribute("aria-label", `${ariaPrefix} to ${restoreText}`);
+  }
+
+  // Shows the *effective* value (the base run through the researched-tech
+  // multiplier `mult`; 1 = no effect). What the player types is an effective
+  // number, stored as the implied base (n / mult) so it keeps tracking later
+  // tech changes. A value that differs from what the model predicts is drawn in
+  // orange with a revert button.
   function statInput(tr, entity, id, key, opts, mult) {
     const td = cell(tr);
     const wrap = document.createElement("span");
@@ -824,21 +868,30 @@
     function fieldValue(v) {
       return opts.format ? opts.format(v) : String(v);
     }
+    const defBase = DEFAULT_BY_ID[id][key];
+    const toEff = (b) => F().effectiveSmeltTime(b, mult);
+    const defEff = toEff(defBase);
 
     const input = document.createElement("input");
     if (opts.format) {
       // text field so it can hold e.g. "3.05M" or "1h 5m"; opts.parse inverts it
       input.type = "text";
-      input.value = fieldValue(entity[key]);
     } else {
       input.type = "number";
       input.min = "0";
       input.step = opts.integer ? "1" : "any";
-      input.value = String(entity[key]);
     }
+    input.value = fieldValue(toEff(entity[key]));
     input.setAttribute("aria-label", `${entity.name} ${key}`);
 
-    let effInput = null;
+    const resetBtn = resetButton();
+    function sync() {
+      const stored = state.overrides[id] && state.overrides[id][key];
+      const overridden = stored !== undefined && toEff(stored) !== defEff;
+      syncOverrideUI(input, resetBtn, overridden, fieldValue(defEff), `Reset ${entity.name} ${key}`);
+    }
+    sync();
+
     input.addEventListener("input", () => {
       const raw = input.value.trim();
       const n = opts.parse ? opts.parse(raw) : Number(raw);
@@ -846,44 +899,23 @@
       if (ok && opts.integer && !Number.isInteger(n)) ok = false;
       input.classList.toggle("invalid", !ok);
       if (!ok) return;
-      setStat(id, key, n);
-      if (effInput) effInput.value = fieldValue(F().effectiveSmeltTime(n, mult));
+      // Typing the model's own number back stores the exact default base, not
+      // the lossy n / mult (effectiveSmeltTime rounds), so it can't drift when
+      // mult later changes.
+      setStat(id, key, n === defEff ? defBase : n / mult);
+      sync();
       renderChart();
     });
+    resetBtn.addEventListener("click", () => {
+      clearStat(id, key);
+      input.value = fieldValue(defEff);
+      input.classList.remove("invalid");
+      sync();
+      renderChart();
+    });
+
     wrap.appendChild(input);
-
-    if (mult !== 1) {
-      const arrow = document.createElement("span");
-      arrow.className = "eff-arrow";
-      arrow.textContent = "→";
-      wrap.appendChild(arrow);
-
-      effInput = document.createElement("input");
-      effInput.className = "eff-input";
-      if (opts.format) {
-        effInput.type = "text";
-      } else {
-        effInput.type = "number";
-        effInput.min = "0";
-        effInput.step = opts.integer ? "1" : "any";
-      }
-      effInput.value = fieldValue(F().effectiveSmeltTime(entity[key], mult));
-      effInput.setAttribute("aria-label", `${entity.name} ${key} (effective)`);
-      effInput.addEventListener("input", () => {
-        const raw = effInput.value.trim();
-        const n = opts.parse ? opts.parse(raw) : Number(raw);
-        let ok = raw !== "" && isFinite(n) && !Number.isNaN(n) && n >= 0;
-        if (ok && opts.integer && !Number.isInteger(n)) ok = false;
-        effInput.classList.toggle("invalid", !ok);
-        if (!ok) return;
-        const base = n / mult;
-        setStat(id, key, base);
-        input.value = fieldValue(base);
-        renderChart();
-      });
-      wrap.appendChild(effInput);
-    }
-
+    wrap.appendChild(resetBtn);
     td.appendChild(wrap);
   }
 
@@ -1010,17 +1042,13 @@
     tdStars.appendChild(wrap);
   }
 
-  // Renders the three remaining price cells: read-only base price, editable
+  // Renders the two remaining price cells: editable
   // market roll, and read-only effective sell price (the product of
   // basePrice, stars, market, and the global bonus controls — see
   // sellPriceParts in model.js). Only market is per-entity here (stars is
   // rendered separately by renderStarsCell); the rest come from the "Sell
   // price bonuses" card and apply across every row.
   function renderPriceCells(tr, entity, id) {
-    const tdBase = cell(tr);
-    tdBase.className = "price-readonly";
-    tdBase.textContent = F().formatMoney(entity.basePrice);
-
     const tdMarket = cell(tr);
     const marketSelect = document.createElement("select");
     marketSelect.className = "market-select";
@@ -1084,6 +1112,12 @@
     td.className = "col-ingredients";
     for (const ing of entity.ingredients) {
       const child = DEFAULT_BY_ID[ing.sellableId];
+      const defBase = DEFAULT_BY_ID[id].ingredients.find(
+        (i) => i.sellableId === ing.sellableId
+      ).amount;
+      const toEff = (b) => F().effectiveIngredientAmount(b, mult);
+      const defEff = toEff(defBase);
+
       const row = document.createElement("div");
       row.className = "ing-row";
 
@@ -1096,59 +1130,54 @@
       x.className = "ing-x";
       x.textContent = "×";
 
+      // Shows the effective amount; what's typed is stored as the implied base
+      // (see statInput).
       const input = document.createElement("input");
       input.type = "number";
       input.min = "0";
       input.step = "any";
-      input.value = String(ing.amount);
+      input.value = String(toEff(ing.amount));
       input.setAttribute("aria-label", `${entity.name} ${child.name} amount`);
 
-      let effInput = null;
+      const resetBtn = resetButton();
+      function sync() {
+        const stored =
+          state.overrides[id] &&
+          state.overrides[id].ingredients &&
+          state.overrides[id].ingredients[ing.sellableId];
+        const overridden = stored !== undefined && toEff(stored) !== defEff;
+        syncOverrideUI(
+          input,
+          resetBtn,
+          overridden,
+          String(defEff),
+          `Reset ${entity.name} ${child.name} amount`
+        );
+      }
+      sync();
+
       input.addEventListener("input", () => {
         const raw = input.value.trim();
         const n = Number(raw);
         const ok = raw !== "" && isFinite(n) && n > 0;
         input.classList.toggle("invalid", !ok);
         if (!ok) return;
-        setIngredientAmount(id, ing.sellableId, n);
-        if (effInput) effInput.value = String(F().effectiveIngredientAmount(n, mult));
+        setIngredientAmount(id, ing.sellableId, n === defEff ? defBase : n / mult);
+        sync();
+        renderChart();
+      });
+      resetBtn.addEventListener("click", () => {
+        clearIngredientAmount(id, ing.sellableId);
+        input.value = String(defEff);
+        input.classList.remove("invalid");
+        sync();
         renderChart();
       });
 
       row.appendChild(name);
       row.appendChild(x);
       row.appendChild(input);
-
-      if (mult !== 1) {
-        const arrow = document.createElement("span");
-        arrow.className = "eff-arrow";
-        arrow.textContent = "→";
-        row.appendChild(arrow);
-
-        effInput = document.createElement("input");
-        effInput.type = "number";
-        effInput.min = "0";
-        effInput.step = "any";
-        effInput.value = String(F().effectiveIngredientAmount(ing.amount, mult));
-        effInput.className = "eff-input";
-        effInput.setAttribute(
-          "aria-label",
-          `${entity.name} ${child.name} amount (effective)`
-        );
-        effInput.addEventListener("input", () => {
-          const raw = effInput.value.trim();
-          const n = Number(raw);
-          const ok = raw !== "" && isFinite(n) && n > 0;
-          effInput.classList.toggle("invalid", !ok);
-          if (!ok) return;
-          const base = n / mult;
-          setIngredientAmount(id, ing.sellableId, base);
-          input.value = String(base);
-          renderChart();
-        });
-        row.appendChild(effInput);
-      }
-
+      row.appendChild(resetBtn);
       td.appendChild(row);
     }
   }

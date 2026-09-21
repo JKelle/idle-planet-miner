@@ -13,6 +13,9 @@
   --border: #e4e6ef;
   --danger: #c0362c;
   --danger-bg: #fdf3f2;
+  --override: #b45309;
+  --override-bg: #fffaf0;
+  --override-border: #f0b429;
   --radius: 12px;
   --radius-lg: 16px;
   --shadow: 0 1px 2px rgba(18, 22, 45, 0.04), 0 6px 20px rgba(18, 22, 45, 0.06);
@@ -466,11 +469,7 @@ select {
 
 .stat-table {
   width: 100%;
-  /* Widened for the time/ingredients columns, which need room for a raw
-   * field plus a linked "effective" field when a researched tech changes an
-   * alloy's numbers (see .eff-arrow/.eff-input), plus the stars/base
-   * price/market/sell price columns. */
-  min-width: 1204px;
+  min-width: 900px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-sm);
@@ -495,26 +494,21 @@ select {
 
 .stat-table th:nth-child(4),
 .stat-table td:nth-child(4) {
-  width: 170px;
+  width: 118px;
 }
 
 .stat-table th:nth-child(5),
 .stat-table td:nth-child(5) {
-  width: 300px;
+  width: 210px;
 }
 
 .stat-table th:nth-child(6),
 .stat-table td:nth-child(6) {
-  width: 110px;
+  width: 90px;
 }
 
 .stat-table th:nth-child(7),
 .stat-table td:nth-child(7) {
-  width: 90px;
-}
-
-.stat-table th:nth-child(8),
-.stat-table td:nth-child(8) {
   width: 120px;
 }
 
@@ -628,29 +622,48 @@ select {
   cursor: pointer;
 }
 
-/* Wraps a raw stat field and, when a researched tech applies, its linked
- * "effective" field — display:flex on the <td> itself would opt it out of
- * the table's column-width sharing with its header cell, so this flexes an
- * inner wrapper instead. */
+/* Wraps a stat field and its revert button — display:flex on the <td> itself
+ * would opt it out of the table's column-width sharing with its header cell,
+ * so this flexes an inner wrapper instead. */
 .stat-wrap {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.eff-arrow {
-  color: var(--text-soft);
+/* A value the player changed away from what the model predicts. */
+.stat-table input.overridden {
+  color: var(--override);
+  border-color: var(--override-border);
+  background: var(--override-bg);
 }
 
-.eff-input {
-  color: var(--text-soft);
+/* Revert button. Its slot is always reserved (visibility, not display) so it
+ * appearing never shifts the row or misaligns stacked ingredient rows. */
+.stat-reset {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--override);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  visibility: hidden;
 }
 
-/* Base price and effective sell price: computed, not directly editable. */
-.price-readonly {
-  color: var(--text-soft);
+.stat-reset.shown {
+  visibility: visible;
 }
 
+.stat-reset:hover {
+  background: var(--override-bg);
+}
+
+/* Effective sell price: computed, not directly editable. */
 .stat-table td.price-readonly[data-eff-for] {
   color: var(--text);
   font-weight: 600;
@@ -663,6 +676,13 @@ select {
 input.invalid {
   border-color: var(--danger);
   background: var(--danger-bg);
+}
+
+/* Invalid must beat the orange override styling above (higher specificity). */
+.stat-table input.overridden.invalid {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: inherit;
 }
 
 /* Restated as "input.stars-input.invalid" to match the specificity of (and,
