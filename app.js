@@ -1677,6 +1677,20 @@
       const row = document.createElement("div");
       row.className = "manager-row market-row";
 
+      // Shows the chosen resource's icon (same assets/icons/<id>.webp used
+      // in the stat tables — see entityIcon). Kept invisible rather than
+      // omitted when no resource is picked yet, so the select doesn't jump
+      // sideways once one is.
+      const icon = document.createElement("img");
+      icon.className = "entity-icon market-icon";
+      icon.alt = "";
+      if (b.sellableId) {
+        icon.src = "assets/icons/" + b.sellableId + ".webp";
+      } else {
+        icon.style.visibility = "hidden";
+      }
+      row.appendChild(icon);
+
       const resourceSelect = document.createElement("select");
       resourceSelect.className = "market-resource";
       const blank = document.createElement("option");

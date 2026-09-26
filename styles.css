@@ -388,6 +388,12 @@ select {
   margin-bottom: 8px;
 }
 
+.market-row .market-icon {
+  height: 20px;
+  width: 20px;
+  flex: none;
+}
+
 .market-row .market-resource {
   flex: 1;
 }
