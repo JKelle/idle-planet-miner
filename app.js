@@ -63,19 +63,18 @@
   // market boost") ended up discarding players' saved edits.
   const STORAGE_VERSION = 9;
 
-  // Market roll presets, matching what the in-game Market dialog offers.
-  // Labels carry the same up/down arrow count as the in-game dialog (see
-  // rollChevronCount below, which derives the count a roll-tag's colored SVG
-  // chevrons use from its amount) so the dropdown options — and the closed
-  // select, which just mirrors whichever option is selected — read the same
-  // way the game does.
+  // Market boost presets, matching what the in-game Market dialog offers.
+  // The colored chevrons next to this select (see boostChevronsSvg below)
+  // already show the direction and count, so these labels stay plain
+  // numbers rather than duplicating that with a second, uncolored set of
+  // arrows.
   const MARKET_OPTIONS = [
-    { value: 0.33, label: "▼▼ ×0.33" },
-    { value: 0.5, label: "▼ ×0.5" },
-    { value: 2, label: "▲ ×2" },
-    { value: 3, label: "▲▲ ×3" },
-    { value: 4, label: "▲▲▲ ×4" },
-    { value: 5, label: "▲▲▲▲ ×5" },
+    { value: 0.33, label: "×0.33" },
+    { value: 0.5, label: "×0.5" },
+    { value: 2, label: "×2" },
+    { value: 3, label: "×3" },
+    { value: 4, label: "×4" },
+    { value: 5, label: "×5" },
   ];
 
   // model.js declares these as globals in the browser (classic script). Bridge
@@ -145,10 +144,10 @@
       techAdvancedItemValue: true,
       techSuperiorItemValue: false,
       managers: [],
-      // Active market rolls, entered directly rather than derived — same
+      // Active market boosts, entered directly rather than derived — same
       // open-ended list shape as managers/moduleEffects (id, plus a
-      // sellableId + amount per row). See marketBoostFor below for how a
-      // row's amount reaches sellPriceParts as entity.market.
+      // sellableId + amount per entry). See marketBoostFor below for how an
+      // entry's amount reaches sellPriceParts as entity.market.
       marketBoosts: [],
       // Mothership Room levels (Forge/Workshop/Underforge/Dorm/Sales/
       // Marketing) and Station tech-node levels (Smelting/Crafting 5 each,
@@ -159,7 +158,7 @@
       // 1.04/1.45, Item 1.04/1.45): Sales level 7 -> x1.45, value4 level 2 ->
       // x1.04 (2 x 0.02/lvl, the only exact-fit combination of the value
       // ladder's per-node increments), Marketing level 0 -> x1.00 (no
-      // boosted market roll in the default save). Ores have no station-value
+      // active market boost in the default save). Ores have no station-value
       // or Sales/Marketing bonus in-game, so those never apply to ores.
       forgeLevel: 0,
       workshopLevel: 0,
@@ -195,7 +194,7 @@
       // Which <details> disclosure groups start open. View state only (never
       // affects the model), kept flat like the rest of `controls` so a saved
       // partial object merges cleanly. Stat tables default open since stars/
-      // market rolls change often; everything else defaults closed.
+      // market boosts change often; everything else defaults closed.
       open: {
         tech: false,
         rooms: false,
@@ -239,11 +238,11 @@
 
     // v8 -> v9: the per-entity `market` stat (a dropdown on every stats-table
     // row) was replaced by controls.marketBoosts, an explicit list of active
-    // rolls edited in the Market card. STAT_KEYS no longer includes "market",
+    // boosts edited in the Market card. STAT_KEYS no longer includes "market",
     // so a saved ov.market would otherwise just be dropped by the STAT_KEYS
     // loop below like any other unrecognized field — collected here instead
-    // and turned into marketBoosts rows after the loop, so nobody's current
-    // market state is lost.
+    // and turned into marketBoosts entries after the loop, so nobody's
+    // current market state is lost.
     const preV9 = !parsed || typeof parsed.version !== "number" || parsed.version < 9;
     const migratedBoosts = [];
 
@@ -550,10 +549,10 @@
   }
 
   // controls.marketBoosts is an ordered list the player edits directly, so
-  // two rows can name the same resource (an import, or a stale row); the
-  // last one wins, since the game only ever has one roll per resource. The
-  // list is a handful of entries, so scanning it per entity is cheaper than
-  // caching a map that could go stale.
+  // two entries can name the same resource (an import, or a stale entry);
+  // the last one wins, since the game only ever has one active boost per
+  // resource. The list is a handful of entries, so scanning it per entity is
+  // cheaper than caching a map that could go stale.
   function marketBoostFor(id) {
     let mult = 1;
     for (const b of state.controls.marketBoosts) {
@@ -654,9 +653,9 @@
     saveState();
   }
 
-  // Market rolls change every few hours in-game — this clears the whole
+  // Market boosts change every few hours in-game — this clears the whole
   // Market card's list in one go rather than making the player remove each
-  // boost row individually.
+  // boost individually.
   function resetMarkets() {
     state.controls.marketBoosts = [];
     saveState();
@@ -1255,7 +1254,7 @@
       label: "Marketing",
       kind: "marketing",
       max: 60,
-      effect: "scales market rolls above ×1",
+      effect: "scales market boosts above ×1",
       priceOnly: true,
     },
   ];
@@ -1661,39 +1660,39 @@
     }
   }
 
-  // Category id -> singular label, for the roll-search listbox's per-option
-  // category hint (ore/alloy/item are the only categories DEFAULT_ENTITIES
-  // uses — see data.js).
+  // Category id -> singular label, for the resource-search listbox's
+  // per-option category hint (ore/alloy/item are the only categories
+  // DEFAULT_ENTITIES uses — see data.js).
   const CATEGORY_LABELS = {
     ore: "Ore",
     alloy: "Alloy",
     item: "Item",
   };
 
-  // How many up/down chevrons a roll's amount draws, matching the in-game
+  // How many up/down chevrons a boost's amount draws, matching the in-game
   // Market dialog's own arrow count: x2/x0.5 -> 1, x3/x0.33 -> 2, and so on.
   // Capped at 4 so an off-preset amount (e.g. an older/imported save) can't
   // draw an arbitrarily tall stack.
-  function rollChevronCount(amount) {
+  function boostChevronCount(amount) {
     const raw = amount >= 1 ? amount : 1 / amount;
     return Math.max(1, Math.min(4, Math.round(raw) - 1));
   }
 
-  // Builds the small stacked-chevron indicator next to a roll tag's amount,
-  // colored green (boost) or red (glut) via currentColor — see .roll-up/
-  // .roll-down in styles.css. Always the same overall height regardless of
+  // Builds the small stacked-chevron indicator next to a boost tag's amount,
+  // colored green (boost) or red (glut) via currentColor — see .boost-up/
+  // .boost-down in styles.css. Always the same overall height regardless of
   // count, so a x5 tag isn't taller than a x2 tag.
-  function rollChevronsSvg(amount) {
+  function boostChevronsSvg(amount) {
     const svgNS = "http://www.w3.org/2000/svg";
     const up = amount >= 1;
-    const count = rollChevronCount(amount);
+    const count = boostChevronCount(amount);
     const pitch = 4;
     const chevronHeight = 3;
     const stackHeight = chevronHeight + (count - 1) * pitch;
     const startY = (18 - stackHeight) / 2;
     const svg = document.createElementNS(svgNS, "svg");
     svg.setAttribute("viewBox", "0 0 10 18");
-    svg.setAttribute("class", "roll-chevrons");
+    svg.setAttribute("class", "boost-chevrons");
     svg.setAttribute("aria-hidden", "true");
     for (let i = 0; i < count; i++) {
       const y = startY + i * pitch;
@@ -1708,15 +1707,16 @@
   }
 
   // Set to a just-added boost's id right before renderMarketBoostsList() so
-  // that one tag (and only that one) plays the roll-enter entrance animation
-  // — the whole list is rebuilt on every change, so without this every tag
-  // would replay the animation on every edit, not just its own arrival.
-  let lastAddedRollId = null;
+  // that one tag (and only that one) plays the boost-enter entrance
+  // animation — the whole list is rebuilt on every change, so without this
+  // every tag would replay the animation on every edit, not just its own
+  // arrival.
+  let lastAddedBoostId = null;
 
   // Rebuilds the #market-boosts-list tags from state.controls.marketBoosts,
   // and shows/hides the "Clear all" button (#reset-markets) alongside them —
   // it's redundant with a single tag's own remove button, so it only earns
-  // its place once there are 2+ rolls to clear at once.
+  // its place once there are 2+ boosts to clear at once.
   function renderMarketBoostsList() {
     const container = document.getElementById("market-boosts-list");
     container.innerHTML = "";
@@ -1724,21 +1724,21 @@
 
     if (!boosts.length) {
       const empty = document.createElement("p");
-      empty.className = "roll-empty";
-      empty.textContent = "No rolls set. Add the ones showing in your game's market.";
+      empty.className = "boost-empty";
+      empty.textContent = "No boosts set. Add the resources currently boosted in your game's market.";
       container.appendChild(empty);
     }
 
     for (const b of boosts) {
       const entity = DEFAULT_BY_ID[b.sellableId];
       const tag = document.createElement("div");
-      tag.className = "roll-tag " + (b.amount >= 1 ? "roll-up" : "roll-down");
-      if (b.id === lastAddedRollId) tag.classList.add("roll-enter");
+      tag.className = "boost-tag " + (b.amount >= 1 ? "boost-up" : "boost-down");
+      if (b.id === lastAddedBoostId) tag.classList.add("boost-enter");
 
       if (entity) {
         tag.appendChild(entityIcon(entity.id));
         const name = document.createElement("span");
-        name.className = "roll-name";
+        name.className = "boost-name";
         name.textContent = entity.name;
         tag.appendChild(name);
       } else {
@@ -1746,16 +1746,16 @@
         // rename) is kept rather than silently dropped — shown as its own
         // raw id instead of an icon+name so it's still visible and editable.
         const name = document.createElement("span");
-        name.className = "roll-name roll-name-unknown";
+        name.className = "boost-name boost-name-unknown";
         name.textContent = b.sellableId || "(no resource)";
         tag.appendChild(name);
       }
 
-      tag.appendChild(rollChevronsSvg(b.amount));
+      tag.appendChild(boostChevronsSvg(b.amount));
 
       const amountSelect = document.createElement("select");
-      amountSelect.className = "roll-amount";
-      amountSelect.setAttribute("aria-label", `${entity ? entity.name : "roll"} amount`);
+      amountSelect.className = "boost-amount";
+      amountSelect.setAttribute("aria-label", `${entity ? entity.name : "resource"} boost amount`);
       let amountMatched = false;
       for (const opt of MARKET_OPTIONS) {
         const option = document.createElement("option");
@@ -1786,9 +1786,9 @@
 
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.className = "roll-remove";
+      removeBtn.className = "boost-remove";
       removeBtn.textContent = "✕";
-      removeBtn.setAttribute("aria-label", `Remove ${entity ? entity.name : "roll"}`);
+      removeBtn.setAttribute("aria-label", `Remove ${entity ? entity.name : "resource"} boost`);
       removeBtn.addEventListener("click", () => {
         state.controls.marketBoosts = state.controls.marketBoosts.filter((x) => x.id !== b.id);
         saveState();
@@ -1799,19 +1799,19 @@
 
       container.appendChild(tag);
     }
-    lastAddedRollId = null;
+    lastAddedBoostId = null;
 
     document.getElementById("reset-markets").hidden = boosts.length < 2;
   }
 
-  // Wires up the "Add a roll…" combobox once at startup. Unlike the tag
+  // Wires up the "Add a resource…" combobox once at startup. Unlike the tag
   // list above, this widget is never torn down and rebuilt — only the
-  // dropdown's own option list is refreshed as the player types or a roll
+  // dropdown's own option list is refreshed as the player types or a boost
   // is added/removed elsewhere — so focus and the typed query survive
   // across keystrokes.
-  function initRollSearch() {
-    const input = document.getElementById("roll-search-input");
-    const listbox = document.getElementById("roll-search-listbox");
+  function initResourceSearch() {
+    const input = document.getElementById("resource-search-input");
+    const listbox = document.getElementById("resource-search-listbox");
     let options = []; // entities currently shown in the listbox
     let activeIndex = -1;
 
@@ -1828,7 +1828,7 @@
       for (const li of listbox.children) {
         li.classList.toggle("active", li.dataset.index === String(index));
       }
-      input.setAttribute("aria-activedescendant", index >= 0 ? `roll-option-${index}` : "");
+      input.setAttribute("aria-activedescendant", index >= 0 ? `resource-option-${index}` : "");
     }
 
     function openList() {
@@ -1836,17 +1836,17 @@
       listbox.innerHTML = "";
       for (const [i, e] of options.entries()) {
         const li = document.createElement("li");
-        li.id = `roll-option-${i}`;
-        li.className = "roll-option";
+        li.id = `resource-option-${i}`;
+        li.className = "resource-option";
         li.setAttribute("role", "option");
         li.dataset.index = String(i);
         li.appendChild(entityIcon(e.id));
         const name = document.createElement("span");
-        name.className = "roll-option-name";
+        name.className = "resource-option-name";
         name.textContent = e.name;
         li.appendChild(name);
         const cat = document.createElement("span");
-        cat.className = "roll-option-cat";
+        cat.className = "resource-option-cat";
         cat.textContent = CATEGORY_LABELS[e.category];
         li.appendChild(cat);
         // mousedown (not click) fires before the input's blur, so choosing
@@ -1873,7 +1873,7 @@
       const boost = { id: "b" + Math.random().toString(36).slice(2, 10), sellableId, amount: 2 };
       state.controls.marketBoosts.push(boost);
       saveState();
-      lastAddedRollId = boost.id;
+      lastAddedBoostId = boost.id;
       renderMarketBoostsList();
       renderAll();
       input.value = "";
@@ -1961,7 +1961,7 @@
     });
     renderModuleEffectsList();
 
-    initRollSearch();
+    initResourceSearch();
     renderMarketBoostsList();
 
     document.getElementById("reset-all").addEventListener("click", () => {

@@ -16,7 +16,7 @@
   --override: #b45309;
   --override-bg: #fffaf0;
   --override-border: #f0b429;
-  /* Market-roll direction, matching the in-game Market dialog's own
+  /* Market-boost direction, matching the in-game Market dialog's own
    * red/green arrows. --market-down deliberately isn't --danger even
    * though the hue is close — --danger means "invalid input" elsewhere on
    * the page, and the two meanings should be free to diverge later. */
@@ -148,22 +148,22 @@ main {
   font-size: var(--fs-sm);
 }
 
-/* ---- market rolls ---- */
-.roll-list {
+/* ---- market boosts ---- */
+.boost-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
   min-height: 36px;
 }
 
-.roll-empty {
+.boost-empty {
   margin: 0;
-  align-self: center;
   color: var(--text-soft);
   font-size: var(--fs-sm);
 }
 
-.roll-tag {
+.boost-tag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -173,19 +173,19 @@ main {
   background: var(--card);
 }
 
-.roll-name {
+.boost-name {
   font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
 }
 
-.roll-name-unknown {
+.boost-name-unknown {
   font-weight: 400;
   font-style: italic;
   color: var(--text-soft);
 }
 
-.roll-chevrons {
+.boost-chevrons {
   width: 8px;
   height: 15px;
   flex: none;
@@ -196,16 +196,16 @@ main {
   fill: none;
 }
 
-.roll-up .roll-chevrons {
+.boost-up .boost-chevrons {
   color: var(--market-up);
 }
 
-.roll-down .roll-chevrons {
+.boost-down .boost-chevrons {
   color: var(--market-down);
 }
 
 /* Borderless so it reads as part of the tag rather than a separate control. */
-.roll-tag select.roll-amount {
+.boost-tag select.boost-amount {
   border: 0;
   background: none;
   padding: 0 2px;
@@ -216,7 +216,7 @@ main {
   cursor: pointer;
 }
 
-.roll-remove {
+.boost-remove {
   border: 0;
   background: none;
   padding: 0;
@@ -230,12 +230,12 @@ main {
   flex: none;
 }
 
-.roll-remove:hover {
+.boost-remove:hover {
   background: var(--bg);
   color: var(--text);
 }
 
-@keyframes roll-enter {
+@keyframes boost-enter {
   from {
     opacity: 0;
     transform: scale(0.9);
@@ -246,8 +246,8 @@ main {
   }
 }
 
-.roll-enter {
-  animation: roll-enter 120ms ease-out;
+.boost-enter {
+  animation: boost-enter 120ms ease-out;
 }
 
 .market-controls {
@@ -258,11 +258,11 @@ main {
   margin: 12px 0 14px;
 }
 
-.roll-search-wrap {
+.resource-search-wrap {
   position: relative;
 }
 
-.roll-search-input {
+.resource-search-input {
   font: inherit;
   font-size: var(--fs-base);
   padding: 8px 12px;
@@ -274,7 +274,7 @@ main {
   max-width: 100%;
 }
 
-.roll-search-listbox {
+.resource-search-listbox {
   position: absolute;
   z-index: 5;
   top: calc(100% + 4px);
@@ -293,7 +293,7 @@ main {
   box-shadow: var(--shadow);
 }
 
-.roll-option {
+.resource-option {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -303,15 +303,15 @@ main {
   font-size: var(--fs-sm);
 }
 
-.roll-option.active {
+.resource-option.active {
   background: var(--bg);
 }
 
-.roll-option-name {
+.resource-option-name {
   flex: 1;
 }
 
-.roll-option-cat {
+.resource-option-cat {
   color: var(--text-soft);
   font-size: var(--fs-sm);
 }
@@ -369,7 +369,7 @@ main {
     transition: none;
   }
 
-  .roll-enter {
+  .boost-enter {
     animation: none;
   }
 }

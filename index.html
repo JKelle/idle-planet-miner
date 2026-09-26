@@ -9,7 +9,7 @@
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
   <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
   <header class="site-header">
@@ -194,24 +194,25 @@
     <section class="market" aria-label="Market">
       <h2>Market</h2>
       <p class="card-sub">
-        Rolls showing in your game right now. Above ×1 is scaled further by
+        Boosts currently active in your game. Above ×1 is scaled further by
         the Marketing room above; below ×1 is not.
       </p>
-      <div id="market-boosts-list" class="roll-list"></div>
+      <div id="market-boosts-list" class="boost-list"></div>
       <div class="market-controls">
-        <div class="roll-search-wrap">
+        <div class="resource-search-wrap">
           <input
             type="text"
-            id="roll-search-input"
-            class="roll-search-input"
-            placeholder="Add a roll…"
+            id="resource-search-input"
+            class="resource-search-input"
+            placeholder="Add a resource…"
+            aria-label="Add a resource"
             autocomplete="off"
             role="combobox"
             aria-expanded="false"
             aria-autocomplete="list"
-            aria-controls="roll-search-listbox"
+            aria-controls="resource-search-listbox"
           />
-          <ul id="roll-search-listbox" class="roll-search-listbox" role="listbox" hidden></ul>
+          <ul id="resource-search-listbox" class="resource-search-listbox" role="listbox" hidden></ul>
         </div>
         <button type="button" id="reset-markets" class="btn-text" hidden>Clear all</button>
       </div>
@@ -304,6 +305,6 @@
        against fresh markup. Bump v on any deploy touching these 4 files. -->
   <script src="data.js?v=4"></script>
   <script src="model.js?v=8"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
