@@ -9,7 +9,7 @@
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
   <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
   <header class="site-header">
@@ -191,20 +191,32 @@
       </details>
     </section>
 
+    <section class="market" aria-label="Market">
+      <h2>Market</h2>
+      <p class="card-sub">
+        List the market rolls currently active in-game — only resources with
+        a boost need a row here. A boost above ×1 is scaled further by the
+        Marketing room above; a glut below ×1 is not.
+      </p>
+      <div id="market-boosts-list"></div>
+      <button type="button" id="add-market-boost-btn" class="btn-secondary">+ Add market boost</button>
+      <div class="stats-actions">
+        <button type="button" id="reset-markets" class="btn-secondary">Clear all boosts</button>
+      </div>
+    </section>
+
     <section class="stats" aria-label="Stats">
       <h2>Stats</h2>
       <p class="card-sub">
-        Edit stars, market roll, time, and ingredient amounts inline. Base
+        Edit stars, time, and ingredient amounts inline. Base
         price and effective sell price are shown but not directly editable —
-        sell price is base price × stars × the bonuses above. Ores
+        sell price is base price × stars × the bonuses above, including any
+        market boost set in the Market card. Ores
         have no craft time or ingredients and never appear in the chart. Tick
         entities on as you unlock them in-game — turning one on also turns on
         everything it needs; turning one off also turns off anything that needs
         it.
       </p>
-      <div class="stats-actions">
-        <button type="button" id="reset-markets" class="btn-secondary">Reset market boosts</button>
-      </div>
 
       <details class="group" id="group-ores">
         <summary>
@@ -220,7 +232,6 @@
                 <th scope="col">Stars</th>
                 <th></th>
                 <th></th>
-                <th scope="col">Market</th>
                 <th scope="col">Sell price</th>
               </tr>
             </thead>
@@ -243,7 +254,6 @@
                 <th scope="col">Stars</th>
                 <th scope="col">Smelt time</th>
                 <th scope="col" class="col-ingredients">Ingredients</th>
-                <th scope="col">Market</th>
                 <th scope="col">Sell price</th>
               </tr>
             </thead>
@@ -266,7 +276,6 @@
                 <th scope="col">Stars</th>
                 <th scope="col">Craft time</th>
                 <th scope="col" class="col-ingredients">Ingredients</th>
-                <th scope="col">Market</th>
                 <th scope="col">Sell price</th>
               </tr>
             </thead>
@@ -283,6 +292,6 @@
        against fresh markup. Bump v on any deploy touching these 4 files. -->
   <script src="data.js?v=4"></script>
   <script src="model.js?v=8"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

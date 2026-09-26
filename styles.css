@@ -121,6 +121,7 @@ main {
 }
 
 .setup,
+.market,
 .stats {
   background: var(--card);
   border: 1px solid var(--border);
@@ -129,6 +130,7 @@ main {
 }
 
 .setup h2,
+.market h2,
 .stats h2 {
   margin: 20px 0 4px;
   font-size: var(--fs-md);
@@ -378,12 +380,16 @@ select {
   text-align: center;
 }
 
-/* ---- managers / modules ---- */
+/* ---- managers / modules / market ---- */
 .manager-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.market-row .market-resource {
+  flex: 1;
 }
 
 .manager-row input[type="text"] {
@@ -469,7 +475,7 @@ select {
 
 .stat-table {
   width: 100%;
-  min-width: 900px;
+  min-width: 810px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-sm);
@@ -504,11 +510,6 @@ select {
 
 .stat-table th:nth-child(6),
 .stat-table td:nth-child(6) {
-  width: 90px;
-}
-
-.stat-table th:nth-child(7),
-.stat-table td:nth-child(7) {
   width: 120px;
 }
 
@@ -758,6 +759,7 @@ summary:focus-visible {
 
   .chart-panel,
   .setup,
+  .market,
   .stats {
     padding-left: 14px;
     padding-right: 14px;

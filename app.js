@@ -10,7 +10,7 @@
   "use strict";
 
   const STORAGE_KEY = "ipm-explorer-v1";
-  const STAT_KEYS = ["stars", "market", "smeltTimeSeconds"];
+  const STAT_KEYS = ["stars", "smeltTimeSeconds"];
 
   // Level control keys (Rooms and Station nodes) -> max level (see
   // roomMultiplier/stationNodeBonus in model.js). Integer levels where 0 is
@@ -61,11 +61,10 @@
   // the old key) and never let unrecognized fields get silently dropped on
   // load/save — that's how past deploys ("Editable sell price", "Remove
   // market boost") ended up discarding players' saved edits.
-  const STORAGE_VERSION = 8;
+  const STORAGE_VERSION = 9;
 
   // Market roll presets, matching what the in-game Market dialog offers.
   const MARKET_OPTIONS = [
-    { value: 1, label: "—" },
     { value: 0.33, label: "×0.33" },
     { value: 0.5, label: "×0.5" },
     { value: 2, label: "×2" },
@@ -141,6 +140,11 @@
       techAdvancedItemValue: true,
       techSuperiorItemValue: false,
       managers: [],
+      // Active market rolls, entered directly rather than derived — same
+      // open-ended list shape as managers/moduleEffects (id, plus a
+      // sellableId + amount per row). See marketBoostFor below for how a
+      // row's amount reaches sellPriceParts as entity.market.
+      marketBoosts: [],
       // Mothership Room levels (Forge/Workshop/Underforge/Dorm/Sales/
       // Marketing) and Station tech-node levels (Smelting/Crafting 5 each,
       // Items & Alloys "value" 7) — see techMultipliers/sellPriceParts in
@@ -228,6 +232,16 @@
     // Station/Manager/Forge/Workshop/Module speed boosts now modeled on top.
     const preV8 = !parsed || typeof parsed.version !== "number" || parsed.version < 8;
 
+    // v8 -> v9: the per-entity `market` stat (a dropdown on every stats-table
+    // row) was replaced by controls.marketBoosts, an explicit list of active
+    // rolls edited in the Market card. STAT_KEYS no longer includes "market",
+    // so a saved ov.market would otherwise just be dropped by the STAT_KEYS
+    // loop below like any other unrecognized field — collected here instead
+    // and turned into marketBoosts rows after the loop, so nobody's current
+    // market state is lost.
+    const preV9 = !parsed || typeof parsed.version !== "number" || parsed.version < 9;
+    const migratedBoosts = [];
+
     const clean = {};
     for (const [id, ov] of Object.entries(overrides)) {
       if (!ov || typeof ov !== "object") continue;
@@ -237,6 +251,13 @@
         if (typeof ov[k] === "number" && isFinite(ov[k]) && ov[k] >= 0) {
           entry[k] = ov[k];
         }
+      }
+      if (preV9 && typeof ov.market === "number" && isFinite(ov.market) && ov.market > 0 && ov.market !== 1) {
+        migratedBoosts.push({
+          id: "b" + Math.random().toString(36).slice(2, 10),
+          sellableId: id,
+          amount: ov.market,
+        });
       }
       if (typeof ov.unlocked === "boolean") entry.unlocked = ov.unlocked;
       if (!preV6 && ov.ingredients && typeof ov.ingredients === "object") {
@@ -372,6 +393,9 @@
       delete incomingControls.station;
       delete incomingControls.marketingRoom;
     }
+    if (preV9 && migratedBoosts.length) {
+      incomingControls.marketBoosts = migratedBoosts;
+    }
 
     for (const [k, max] of Object.entries(LEVEL_CONTROL_KEYS)) {
       const v = incomingControls[k];
@@ -401,6 +425,27 @@
       cleanManagers.push({ id, name, boostType, boostAmount });
     }
     incomingControls.managers = cleanManagers;
+
+    // Market boosts: same array-of-entries shape and validation approach as
+    // Managers above. sellableId is kept even when it no longer matches a
+    // data.js entity (e.g. after a rename) rather than dropped, per this
+    // function's own no-silent-drop rule.
+    const rawMarketBoosts = Array.isArray(incomingControls.marketBoosts)
+      ? incomingControls.marketBoosts
+      : [];
+    const seenMarketBoostIds = new Set();
+    const cleanMarketBoosts = [];
+    for (const b of rawMarketBoosts) {
+      if (!b || typeof b !== "object") continue;
+      const sellableId = typeof b.sellableId === "string" ? b.sellableId : "";
+      const amount =
+        typeof b.amount === "number" && isFinite(b.amount) && b.amount > 0 ? b.amount : 1;
+      let id = typeof b.id === "string" && b.id && !seenMarketBoostIds.has(b.id) ? b.id : null;
+      if (!id) id = "b" + Math.random().toString(36).slice(2, 10);
+      seenMarketBoostIds.add(id);
+      cleanMarketBoosts.push({ id, sellableId, amount });
+    }
+    incomingControls.marketBoosts = cleanMarketBoosts;
 
     // Module effects: same array-of-entries shape and validation approach as
     // Managers above, but with a wider category enum (a single Module can
@@ -483,7 +528,7 @@
       category: base.category,
       basePrice: base.basePrice,
       stars: pick(ov.stars, base.stars),
-      market: pick(ov.market, 1),
+      market: marketBoostFor(base.id),
       ingredients: base.ingredients.map((i) => ({
         sellableId: i.sellableId,
         amount: pick(ovIng[i.sellableId], i.amount),
@@ -497,6 +542,19 @@
 
   function pick(a, b) {
     return typeof a === "number" ? a : b;
+  }
+
+  // controls.marketBoosts is an ordered list the player edits directly, so
+  // two rows can name the same resource (an import, or a stale row); the
+  // last one wins, since the game only ever has one roll per resource. The
+  // list is a handful of entries, so scanning it per entity is cheaper than
+  // caching a map that could go stale.
+  function marketBoostFor(id) {
+    let mult = 1;
+    for (const b of state.controls.marketBoosts) {
+      if (b.sellableId === id) mult = b.amount;
+    }
+    return mult;
   }
 
   function isUnlocked(id) {
@@ -591,16 +649,11 @@
     saveState();
   }
 
-  // Market rolls change every few hours in-game, so clearing them one row at a
-  // time is this tool's most-repeated chore. Deleting the key (rather than
-  // writing 1) puts each entity back on resolved()'s implicit default and keeps
-  // the override layer sparse; an override left empty is pruned, matching what
-  // normalizeState does on load.
+  // Market rolls change every few hours in-game — this clears the whole
+  // Market card's list in one go rather than making the player remove each
+  // boost row individually.
   function resetMarkets() {
-    for (const [id, ov] of Object.entries(state.overrides)) {
-      delete ov.market;
-      if (!Object.keys(ov).length) delete state.overrides[id];
-    }
+    state.controls.marketBoosts = [];
     saveState();
   }
 
@@ -809,7 +862,7 @@
         renderIngredientCell(tr, e, base.id, ingredientMult);
       }
 
-      renderPriceCells(tr, e, base.id);
+      renderPriceCell(tr, e, base.id);
       tbody.appendChild(tr);
     }
   }
@@ -1042,31 +1095,12 @@
     tdStars.appendChild(wrap);
   }
 
-  // Renders the two remaining price cells: editable
-  // market roll, and read-only effective sell price (the product of
-  // basePrice, stars, market, and the global bonus controls — see
-  // sellPriceParts in model.js). Only market is per-entity here (stars is
-  // rendered separately by renderStarsCell); the rest come from the "Sell
-  // price bonuses" card and apply across every row.
-  function renderPriceCells(tr, entity, id) {
-    const tdMarket = cell(tr);
-    const marketSelect = document.createElement("select");
-    marketSelect.className = "market-select";
-    marketSelect.setAttribute("aria-label", `${entity.name} market`);
-    for (const opt of MARKET_OPTIONS) {
-      const option = document.createElement("option");
-      option.value = String(opt.value);
-      option.textContent = opt.label;
-      marketSelect.appendChild(option);
-    }
-    marketSelect.value = String(entity.market);
-    marketSelect.addEventListener("change", () => {
-      setStat(id, "market", Number(marketSelect.value));
-      updateEffectivePriceCell(id);
-      renderChart();
-    });
-    tdMarket.appendChild(marketSelect);
-
+  // Renders the read-only effective sell price (the product of basePrice,
+  // stars, market, and the global bonus controls — see sellPriceParts in
+  // model.js). Stars is rendered separately by renderStarsCell; market comes
+  // from the Market card's boost list now, not a per-row control; the rest
+  // come from the "Sell price bonuses" card and apply across every row.
+  function renderPriceCell(tr, entity, id) {
     const tdEff = cell(tr);
     tdEff.className = "price-readonly";
     tdEff.dataset.effFor = id;
@@ -1622,6 +1656,118 @@
     }
   }
 
+  // Category id -> plural label, for the market-boost resource picker's
+  // <optgroup>s (ore/alloy/item are the only categories DEFAULT_ENTITIES
+  // uses — see data.js).
+  const CATEGORY_GROUP_LABELS = [
+    ["ore", "Ores"],
+    ["alloy", "Alloys"],
+    ["item", "Items"],
+  ];
+
+  // Rebuilds the #market-boosts-list rows from state.controls.marketBoosts.
+  // Structurally the same as renderManagersList/renderModuleEffectsList
+  // above, but with a resource picker (grouped by category, one <optgroup>
+  // per CATEGORY_GROUP_LABELS entry) in place of a free-text name, since a
+  // market boost always targets one specific ore/alloy/item.
+  function renderMarketBoostsList() {
+    const container = document.getElementById("market-boosts-list");
+    container.innerHTML = "";
+    for (const b of state.controls.marketBoosts) {
+      const row = document.createElement("div");
+      row.className = "manager-row market-row";
+
+      const resourceSelect = document.createElement("select");
+      resourceSelect.className = "market-resource";
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "Select a resource…";
+      resourceSelect.appendChild(blank);
+      const chosenElsewhere = new Set(
+        state.controls.marketBoosts.filter((x) => x.id !== b.id).map((x) => x.sellableId)
+      );
+      let matched = false;
+      for (const [category, label] of CATEGORY_GROUP_LABELS) {
+        const group = document.createElement("optgroup");
+        group.label = label;
+        for (const e of DEFAULT_ENTITIES.filter((x) => x.category === category)) {
+          const opt = document.createElement("option");
+          opt.value = e.id;
+          opt.textContent = e.name;
+          if (e.id === b.sellableId) {
+            opt.selected = true;
+            matched = true;
+          } else if (chosenElsewhere.has(e.id)) {
+            opt.disabled = true;
+          }
+          group.appendChild(opt);
+        }
+        resourceSelect.appendChild(group);
+      }
+      // A sellableId that no longer matches any entity (e.g. after a rename)
+      // is kept rather than silently dropped — round-trip it as its own
+      // option instead of leaving the select stuck on the blank default.
+      if (!matched && b.sellableId) {
+        const opt = document.createElement("option");
+        opt.value = b.sellableId;
+        opt.textContent = b.sellableId;
+        opt.selected = true;
+        resourceSelect.appendChild(opt);
+      }
+      resourceSelect.setAttribute("aria-label", "Market boost resource");
+      resourceSelect.addEventListener("change", () => {
+        b.sellableId = resourceSelect.value;
+        saveState();
+        renderMarketBoostsList();
+        renderAll();
+      });
+
+      const amountSelect = document.createElement("select");
+      amountSelect.className = "market-select";
+      amountSelect.setAttribute("aria-label", "Market boost amount");
+      let amountMatched = false;
+      for (const opt of MARKET_OPTIONS) {
+        const option = document.createElement("option");
+        option.value = String(opt.value);
+        option.textContent = opt.label;
+        if (opt.value === b.amount) {
+          option.selected = true;
+          amountMatched = true;
+        }
+        amountSelect.appendChild(option);
+      }
+      // Same round-trip rule as the resource id above, for an amount not
+      // among today's presets (e.g. an older/imported save).
+      if (!amountMatched) {
+        const option = document.createElement("option");
+        option.value = String(b.amount);
+        option.textContent = `×${b.amount}`;
+        option.selected = true;
+        amountSelect.insertBefore(option, amountSelect.firstChild);
+      }
+      amountSelect.addEventListener("change", () => {
+        b.amount = Number(amountSelect.value);
+        saveState();
+        renderAll();
+      });
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "manager-remove";
+      removeBtn.textContent = "×";
+      removeBtn.setAttribute("aria-label", "Remove market boost");
+      removeBtn.addEventListener("click", () => {
+        state.controls.marketBoosts = state.controls.marketBoosts.filter((x) => x.id !== b.id);
+        saveState();
+        renderMarketBoostsList();
+        renderAll();
+      });
+
+      row.append(resourceSelect, amountSelect, removeBtn);
+      container.appendChild(row);
+    }
+  }
+
   function initControls() {
     segmented("scale-control", "scale");
     segmented("category-control", "category");
@@ -1675,6 +1821,17 @@
     });
     renderModuleEffectsList();
 
+    document.getElementById("add-market-boost-btn").addEventListener("click", () => {
+      state.controls.marketBoosts.push({
+        id: "b" + Math.random().toString(36).slice(2, 10),
+        sellableId: "",
+        amount: 2,
+      });
+      saveState();
+      renderMarketBoostsList();
+    });
+    renderMarketBoostsList();
+
     document.getElementById("reset-all").addEventListener("click", () => {
       if (!confirm("Reset every stat and unlock back to the game defaults?")) return;
       resetAll();
@@ -1683,6 +1840,7 @@
 
     document.getElementById("reset-markets").addEventListener("click", () => {
       resetMarkets();
+      renderMarketBoostsList();
       renderAll();
     });
 
@@ -1771,6 +1929,7 @@
     renderStationGrid();
     renderManagersList();
     renderModuleEffectsList();
+    renderMarketBoostsList();
     for (const key of Object.keys(state.controls.open)) {
       const details = document.getElementById(`group-${key}`);
       if (details) details.open = state.controls.open[key];
