@@ -64,13 +64,18 @@
   const STORAGE_VERSION = 9;
 
   // Market roll presets, matching what the in-game Market dialog offers.
+  // Labels carry the same up/down arrow count as the in-game dialog (see
+  // rollChevronCount below, which derives the count a roll-tag's colored SVG
+  // chevrons use from its amount) so the dropdown options — and the closed
+  // select, which just mirrors whichever option is selected — read the same
+  // way the game does.
   const MARKET_OPTIONS = [
-    { value: 0.33, label: "×0.33" },
-    { value: 0.5, label: "×0.5" },
-    { value: 2, label: "×2" },
-    { value: 3, label: "×3" },
-    { value: 4, label: "×4" },
-    { value: 5, label: "×5" },
+    { value: 0.33, label: "▼▼ ×0.33" },
+    { value: 0.5, label: "▼ ×0.5" },
+    { value: 2, label: "▲ ×2" },
+    { value: 3, label: "▲▲ ×3" },
+    { value: 4, label: "▲▲▲ ×4" },
+    { value: 5, label: "▲▲▲▲ ×5" },
   ];
 
   // model.js declares these as globals in the browser (classic script). Bridge
@@ -1656,89 +1661,101 @@
     }
   }
 
-  // Category id -> plural label, for the market-boost resource picker's
-  // <optgroup>s (ore/alloy/item are the only categories DEFAULT_ENTITIES
+  // Category id -> singular label, for the roll-search listbox's per-option
+  // category hint (ore/alloy/item are the only categories DEFAULT_ENTITIES
   // uses — see data.js).
-  const CATEGORY_GROUP_LABELS = [
-    ["ore", "Ores"],
-    ["alloy", "Alloys"],
-    ["item", "Items"],
-  ];
+  const CATEGORY_LABELS = {
+    ore: "Ore",
+    alloy: "Alloy",
+    item: "Item",
+  };
 
-  // Rebuilds the #market-boosts-list rows from state.controls.marketBoosts.
-  // Structurally the same as renderManagersList/renderModuleEffectsList
-  // above, but with a resource picker (grouped by category, one <optgroup>
-  // per CATEGORY_GROUP_LABELS entry) in place of a free-text name, since a
-  // market boost always targets one specific ore/alloy/item.
+  // How many up/down chevrons a roll's amount draws, matching the in-game
+  // Market dialog's own arrow count: x2/x0.5 -> 1, x3/x0.33 -> 2, and so on.
+  // Capped at 4 so an off-preset amount (e.g. an older/imported save) can't
+  // draw an arbitrarily tall stack.
+  function rollChevronCount(amount) {
+    const raw = amount >= 1 ? amount : 1 / amount;
+    return Math.max(1, Math.min(4, Math.round(raw) - 1));
+  }
+
+  // Builds the small stacked-chevron indicator next to a roll tag's amount,
+  // colored green (boost) or red (glut) via currentColor — see .roll-up/
+  // .roll-down in styles.css. Always the same overall height regardless of
+  // count, so a x5 tag isn't taller than a x2 tag.
+  function rollChevronsSvg(amount) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const up = amount >= 1;
+    const count = rollChevronCount(amount);
+    const pitch = 4;
+    const chevronHeight = 3;
+    const stackHeight = chevronHeight + (count - 1) * pitch;
+    const startY = (18 - stackHeight) / 2;
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 10 18");
+    svg.setAttribute("class", "roll-chevrons");
+    svg.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < count; i++) {
+      const y = startY + i * pitch;
+      const path = document.createElementNS(svgNS, "path");
+      path.setAttribute(
+        "d",
+        up ? `M1.5,${y + chevronHeight} L5,${y} L8.5,${y + chevronHeight}` : `M1.5,${y} L5,${y + chevronHeight} L8.5,${y}`
+      );
+      svg.appendChild(path);
+    }
+    return svg;
+  }
+
+  // Set to a just-added boost's id right before renderMarketBoostsList() so
+  // that one tag (and only that one) plays the roll-enter entrance animation
+  // — the whole list is rebuilt on every change, so without this every tag
+  // would replay the animation on every edit, not just its own arrival.
+  let lastAddedRollId = null;
+
+  // Rebuilds the #market-boosts-list tags from state.controls.marketBoosts,
+  // and shows/hides the "Clear all" button (#reset-markets) alongside them —
+  // it's redundant with a single tag's own remove button, so it only earns
+  // its place once there are 2+ rolls to clear at once.
   function renderMarketBoostsList() {
     const container = document.getElementById("market-boosts-list");
     container.innerHTML = "";
-    for (const b of state.controls.marketBoosts) {
-      const row = document.createElement("div");
-      row.className = "manager-row market-row";
+    const boosts = state.controls.marketBoosts;
 
-      // Shows the chosen resource's icon (same assets/icons/<id>.webp used
-      // in the stat tables — see entityIcon). Kept invisible rather than
-      // omitted when no resource is picked yet, so the select doesn't jump
-      // sideways once one is.
-      const icon = document.createElement("img");
-      icon.className = "entity-icon market-icon";
-      icon.alt = "";
-      if (b.sellableId) {
-        icon.src = "assets/icons/" + b.sellableId + ".webp";
+    if (!boosts.length) {
+      const empty = document.createElement("p");
+      empty.className = "roll-empty";
+      empty.textContent = "No rolls set. Add the ones showing in your game's market.";
+      container.appendChild(empty);
+    }
+
+    for (const b of boosts) {
+      const entity = DEFAULT_BY_ID[b.sellableId];
+      const tag = document.createElement("div");
+      tag.className = "roll-tag " + (b.amount >= 1 ? "roll-up" : "roll-down");
+      if (b.id === lastAddedRollId) tag.classList.add("roll-enter");
+
+      if (entity) {
+        tag.appendChild(entityIcon(entity.id));
+        const name = document.createElement("span");
+        name.className = "roll-name";
+        name.textContent = entity.name;
+        tag.appendChild(name);
       } else {
-        icon.style.visibility = "hidden";
+        // A sellableId that no longer matches any entity (e.g. after a
+        // rename) is kept rather than silently dropped — shown as its own
+        // raw id instead of an icon+name so it's still visible and editable.
+        const name = document.createElement("span");
+        name.className = "roll-name roll-name-unknown";
+        name.textContent = b.sellableId || "(no resource)";
+        tag.appendChild(name);
       }
-      row.appendChild(icon);
 
-      const resourceSelect = document.createElement("select");
-      resourceSelect.className = "market-resource";
-      const blank = document.createElement("option");
-      blank.value = "";
-      blank.textContent = "Select a resource…";
-      resourceSelect.appendChild(blank);
-      const chosenElsewhere = new Set(
-        state.controls.marketBoosts.filter((x) => x.id !== b.id).map((x) => x.sellableId)
-      );
-      let matched = false;
-      for (const [category, label] of CATEGORY_GROUP_LABELS) {
-        const group = document.createElement("optgroup");
-        group.label = label;
-        for (const e of DEFAULT_ENTITIES.filter((x) => x.category === category)) {
-          const opt = document.createElement("option");
-          opt.value = e.id;
-          opt.textContent = e.name;
-          if (e.id === b.sellableId) {
-            opt.selected = true;
-            matched = true;
-          } else if (chosenElsewhere.has(e.id)) {
-            opt.disabled = true;
-          }
-          group.appendChild(opt);
-        }
-        resourceSelect.appendChild(group);
-      }
-      // A sellableId that no longer matches any entity (e.g. after a rename)
-      // is kept rather than silently dropped — round-trip it as its own
-      // option instead of leaving the select stuck on the blank default.
-      if (!matched && b.sellableId) {
-        const opt = document.createElement("option");
-        opt.value = b.sellableId;
-        opt.textContent = b.sellableId;
-        opt.selected = true;
-        resourceSelect.appendChild(opt);
-      }
-      resourceSelect.setAttribute("aria-label", "Market boost resource");
-      resourceSelect.addEventListener("change", () => {
-        b.sellableId = resourceSelect.value;
-        saveState();
-        renderMarketBoostsList();
-        renderAll();
-      });
+      tag.appendChild(rollChevronsSvg(b.amount));
 
       const amountSelect = document.createElement("select");
-      amountSelect.className = "market-select";
-      amountSelect.setAttribute("aria-label", "Market boost amount");
+      amountSelect.className = "roll-amount";
+      amountSelect.setAttribute("aria-label", `${entity ? entity.name : "roll"} amount`);
       let amountMatched = false;
       for (const opt of MARKET_OPTIONS) {
         const option = document.createElement("option");
@@ -1762,24 +1779,133 @@
       amountSelect.addEventListener("change", () => {
         b.amount = Number(amountSelect.value);
         saveState();
+        renderMarketBoostsList();
         renderAll();
       });
+      tag.appendChild(amountSelect);
 
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.className = "manager-remove";
-      removeBtn.textContent = "×";
-      removeBtn.setAttribute("aria-label", "Remove market boost");
+      removeBtn.className = "roll-remove";
+      removeBtn.textContent = "✕";
+      removeBtn.setAttribute("aria-label", `Remove ${entity ? entity.name : "roll"}`);
       removeBtn.addEventListener("click", () => {
         state.controls.marketBoosts = state.controls.marketBoosts.filter((x) => x.id !== b.id);
         saveState();
         renderMarketBoostsList();
         renderAll();
       });
+      tag.appendChild(removeBtn);
 
-      row.append(resourceSelect, amountSelect, removeBtn);
-      container.appendChild(row);
+      container.appendChild(tag);
     }
+    lastAddedRollId = null;
+
+    document.getElementById("reset-markets").hidden = boosts.length < 2;
+  }
+
+  // Wires up the "Add a roll…" combobox once at startup. Unlike the tag
+  // list above, this widget is never torn down and rebuilt — only the
+  // dropdown's own option list is refreshed as the player types or a roll
+  // is added/removed elsewhere — so focus and the typed query survive
+  // across keystrokes.
+  function initRollSearch() {
+    const input = document.getElementById("roll-search-input");
+    const listbox = document.getElementById("roll-search-listbox");
+    let options = []; // entities currently shown in the listbox
+    let activeIndex = -1;
+
+    function availableEntities(query) {
+      const taken = new Set(state.controls.marketBoosts.map((b) => b.sellableId));
+      const q = query.trim().toLowerCase();
+      return DEFAULT_ENTITIES.filter(
+        (e) => !taken.has(e.id) && (!q || e.name.toLowerCase().includes(q))
+      );
+    }
+
+    function setActive(index) {
+      activeIndex = index;
+      for (const li of listbox.children) {
+        li.classList.toggle("active", li.dataset.index === String(index));
+      }
+      input.setAttribute("aria-activedescendant", index >= 0 ? `roll-option-${index}` : "");
+    }
+
+    function openList() {
+      options = availableEntities(input.value);
+      listbox.innerHTML = "";
+      for (const [i, e] of options.entries()) {
+        const li = document.createElement("li");
+        li.id = `roll-option-${i}`;
+        li.className = "roll-option";
+        li.setAttribute("role", "option");
+        li.dataset.index = String(i);
+        li.appendChild(entityIcon(e.id));
+        const name = document.createElement("span");
+        name.className = "roll-option-name";
+        name.textContent = e.name;
+        li.appendChild(name);
+        const cat = document.createElement("span");
+        cat.className = "roll-option-cat";
+        cat.textContent = CATEGORY_LABELS[e.category];
+        li.appendChild(cat);
+        // mousedown (not click) fires before the input's blur, so choosing
+        // with the mouse commits before closeList()'s blur handler runs.
+        li.addEventListener("mousedown", (ev) => {
+          ev.preventDefault();
+          commit(e.id);
+        });
+        listbox.appendChild(li);
+      }
+      const hasOptions = options.length > 0;
+      listbox.hidden = !hasOptions;
+      input.setAttribute("aria-expanded", String(hasOptions));
+      setActive(hasOptions ? 0 : -1);
+    }
+
+    function closeList() {
+      listbox.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      setActive(-1);
+    }
+
+    function commit(sellableId) {
+      const boost = { id: "b" + Math.random().toString(36).slice(2, 10), sellableId, amount: 2 };
+      state.controls.marketBoosts.push(boost);
+      saveState();
+      lastAddedRollId = boost.id;
+      renderMarketBoostsList();
+      renderAll();
+      input.value = "";
+      openList();
+      input.focus();
+    }
+
+    input.addEventListener("input", openList);
+    input.addEventListener("focus", openList);
+    input.addEventListener("blur", () => {
+      // Deferred so a listbox mousedown's preventDefault (above) still gets
+      // to run commit() before the list closes.
+      setTimeout(closeList, 100);
+    });
+    input.addEventListener("keydown", (ev) => {
+      if (listbox.hidden && (ev.key === "ArrowDown" || ev.key === "ArrowUp")) {
+        openList();
+        return;
+      }
+      if (ev.key === "ArrowDown") {
+        ev.preventDefault();
+        if (options.length) setActive((activeIndex + 1) % options.length);
+      } else if (ev.key === "ArrowUp") {
+        ev.preventDefault();
+        if (options.length) setActive((activeIndex - 1 + options.length) % options.length);
+      } else if (ev.key === "Enter") {
+        ev.preventDefault();
+        if (activeIndex >= 0 && options[activeIndex]) commit(options[activeIndex].id);
+      } else if (ev.key === "Escape") {
+        closeList();
+      }
+    });
   }
 
   function initControls() {
@@ -1835,15 +1961,7 @@
     });
     renderModuleEffectsList();
 
-    document.getElementById("add-market-boost-btn").addEventListener("click", () => {
-      state.controls.marketBoosts.push({
-        id: "b" + Math.random().toString(36).slice(2, 10),
-        sellableId: "",
-        amount: 2,
-      });
-      saveState();
-      renderMarketBoostsList();
-    });
+    initRollSearch();
     renderMarketBoostsList();
 
     document.getElementById("reset-all").addEventListener("click", () => {
