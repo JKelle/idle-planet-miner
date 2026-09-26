@@ -9,7 +9,7 @@
   <meta property="og:title" content="Idle Planet Miner — Profitability Explorer" />
   <meta property="og:description" content="Plug in your own Idle Planet Miner save — star levels, prices — and see which alloy or item is most profitable to smelt or craft per second." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
   <header class="site-header">
@@ -80,62 +80,14 @@
           <span class="group-summary" id="summary-tech"></span>
         </summary>
         <p class="card-sub">
-          Tick a tech to see what researching it would do to alloy/item sell
-          prices, smelt times, and ingredient costs. Base prices never
-          include these bonuses, so a toggle simply means "I've researched
-          this".
+          Click a tech to see what researching it would do to alloy/item sell
+          prices, smelt times, and ingredient costs. Laid out like the game's
+          own tech tree — dimmed nodes are other techs that don't affect this
+          tool's math. Base prices never include these bonuses, so toggling a
+          tech on simply means "I've researched this".
         </p>
-        <div class="techs-list">
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-advanced-furnace" />
-            <img class="entity-icon" src="assets/icons/tech-advanced-furnace.webp" alt="" />
-            Advanced Furnace — all smelters ×1.2 speed
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-superior-furnace" />
-            <img class="entity-icon" src="assets/icons/tech-superior-furnace.webp" alt="" />
-            Superior Furnace — all smelters ×1.2 speed
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-smelting-efficiency" />
-            <img class="entity-icon" src="assets/icons/tech-smelting-efficiency.webp" alt="" />
-            Smelting Efficiency — all smelter ingredients −20%
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-advanced-alloy-value" />
-            <img class="entity-icon" src="assets/icons/tech-advanced-alloy-value.webp" alt="" />
-            Advanced Alloy Value — all alloy values ×1.2
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-superior-alloy-value" />
-            <img class="entity-icon" src="assets/icons/tech-superior-alloy-value.webp" alt="" />
-            Superior Alloy Value — all alloy values ×1.2
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-advanced-crafting" />
-            <img class="entity-icon" src="assets/icons/tech-advanced-crafting.webp" alt="" />
-            Advanced Crafting — all crafting stations ×1.2 speed
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-superior-crafting" />
-            <img class="entity-icon" src="assets/icons/tech-superior-crafting.webp" alt="" />
-            Superior Crafting — all crafting stations ×1.2 speed
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-crafting-efficiency" />
-            <img class="entity-icon" src="assets/icons/tech-crafting-efficiency.webp" alt="" />
-            Crafting Efficiency — all crafting station ingredients −20%
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-advanced-item-value" />
-            <img class="entity-icon" src="assets/icons/tech-advanced-item-value.webp" alt="" />
-            Advanced Item Value — all item values ×1.2
-          </label>
-          <label class="tech-toggle">
-            <input type="checkbox" id="tech-superior-item-value" />
-            <img class="entity-icon" src="assets/icons/tech-superior-item-value.webp" alt="" />
-            Superior Item Value — all item values ×1.2
-          </label>
+        <div class="tech-tree-scroll">
+          <div class="tech-tree" id="tech-tree"></div>
         </div>
       </details>
 
@@ -303,8 +255,8 @@
   <!-- ?v=N cache-busts GitHub Pages' 10-minute asset cache against this
        file's own caching, so a freshly-loaded page never runs stale JS/CSS
        against fresh markup. Bump v on any deploy touching these 4 files. -->
-  <script src="data.js?v=4"></script>
+  <script src="data.js?v=5"></script>
   <script src="model.js?v=8"></script>
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

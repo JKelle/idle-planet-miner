@@ -1220,20 +1220,10 @@
     }
   }
 
-  // Checkbox id <-> controls key for each researched-tech toggle. Shared by
-  // initControls (wiring) and syncControlsUI (post-import resync).
-  const TECH_TOGGLES = [
-    ["tech-advanced-furnace", "techAdvancedFurnace"],
-    ["tech-smelting-efficiency", "techSmeltingEfficiency"],
-    ["tech-superior-furnace", "techSuperiorFurnace"],
-    ["tech-advanced-crafting", "techAdvancedCrafting"],
-    ["tech-superior-crafting", "techSuperiorCrafting"],
-    ["tech-crafting-efficiency", "techCraftingEfficiency"],
-    ["tech-advanced-alloy-value", "techAdvancedAlloyValue"],
-    ["tech-superior-alloy-value", "techSuperiorAlloyValue"],
-    ["tech-advanced-item-value", "techAdvancedItemValue"],
-    ["tech-superior-item-value", "techSuperiorItemValue"],
-  ];
+  // The 10 TECH_TREE (data.js) nodes that actually feed the model, i.e. the
+  // ones with a `key` — the rest are inert context tiles. Shared by
+  // renderTechTree (rebuild) and updateGroupSummary (the "N of 10" count).
+  const TECH_NODES = TECH_TREE.nodes.filter((n) => n.key);
 
   // Every Mothership Room whose level feeds the price/speed model, generated
   // into #rooms-grid by renderRoomsGrid below (there are now 6 — too many to
@@ -1424,6 +1414,76 @@
     }
   }
 
+  // Rebuilds #tech-tree from TECH_TREE (data.js), laid out on a CSS grid at
+  // the same col/row coordinates as the in-game tech tree. Modeled nodes
+  // (those with a `key`) are clickable buttons wired to state.controls;
+  // nodes without a `key` are other in-game techs this tool doesn't model,
+  // rendered dim and inert just to keep the tree's shape recognizable and
+  // its connector lines from dead-ending. Same full-rebuild convention as
+  // renderStationGrid above.
+  function renderTechTree() {
+    const container = document.getElementById("tech-tree");
+    container.style.setProperty("--tech-cols", String(TECH_TREE.cols));
+    container.style.setProperty("--tech-rows", String(TECH_TREE.rows));
+
+    const nodeByCoordId = {};
+    for (const node of TECH_TREE.nodes) nodeByCoordId[`c${node.col}r${node.row}`] = node;
+    const lines = TECH_TREE.edges
+      .map(([a, b]) => {
+        const na = nodeByCoordId[a];
+        const nb = nodeByCoordId[b];
+        return `<line x1="${na.col + 0.5}" y1="${na.row + 0.5}" x2="${nb.col + 0.5}" y2="${nb.row + 0.5}" />`;
+      })
+      .join("");
+    container.innerHTML = `<svg class="tech-tree-edges" viewBox="0 0 ${TECH_TREE.cols} ${TECH_TREE.rows}" preserveAspectRatio="none">${lines}</svg>`;
+
+    for (const node of TECH_TREE.nodes) {
+      const el = document.createElement(node.key ? "button" : "div");
+      el.className = "tech-node";
+      el.style.gridColumn = String(node.col + 1);
+      el.style.gridRow = String(node.row + 1);
+
+      if (node.key) {
+        el.type = "button";
+        const researched = !!state.controls[node.key];
+        el.classList.toggle("is-researched", researched);
+        el.setAttribute("aria-pressed", String(researched));
+        el.title = `${node.name} — ${node.effect}`;
+        el.setAttribute("aria-label", el.title);
+      } else {
+        el.classList.add("is-context");
+        el.setAttribute("aria-hidden", "true");
+      }
+
+      const iconId = node.key ? node.id : `tech-tree/ctx-c${node.col}r${node.row}`;
+      const icon = entityIcon(iconId);
+      icon.className = "tech-icon";
+      el.appendChild(icon);
+
+      if (node.key) {
+        const label = document.createElement("span");
+        label.className = "tech-name";
+        label.textContent = node.name;
+        el.appendChild(label);
+
+        el.addEventListener("click", () => {
+          const next = !state.controls[node.key];
+          state.controls[node.key] = next;
+          el.classList.toggle("is-researched", next);
+          el.setAttribute("aria-pressed", String(next));
+          saveState();
+          updateGroupSummary("tech");
+          // Techs change the stat table's effective fields too, not just the
+          // chart, so this needs the full re-render (unlike the other
+          // controls) — same as the checkbox list this replaced.
+          renderAll();
+        });
+      }
+
+      container.appendChild(el);
+    }
+  }
+
   // ---- disclosure groups & their live summaries ----------------------
 
   // <details> id (minus the "group-" prefix) <-> what its <summary> reports
@@ -1432,8 +1492,8 @@
   function groupSummaryText(key) {
     switch (key) {
       case "tech": {
-        const n = TECH_TOGGLES.filter(([, k]) => state.controls[k]).length;
-        return `${n} of ${TECH_TOGGLES.length} researched`;
+        const n = TECH_NODES.filter((node) => state.controls[node.key]).length;
+        return `${n} of ${TECH_NODES.length} researched`;
       }
       case "rooms": {
         const bought = ROOMS.filter((r) => state.controls[r.key] > 0);
@@ -1920,17 +1980,7 @@
       renderChart();
     });
 
-    for (const [checkboxId, key] of TECH_TOGGLES) {
-      const cb = document.getElementById(checkboxId);
-      cb.checked = state.controls[key];
-      cb.addEventListener("change", () => {
-        state.controls[key] = cb.checked;
-        saveState();
-        // Techs change the stat table's effective fields too, not just the
-        // chart, so this needs the full re-render (unlike the other controls).
-        renderAll();
-      });
-    }
+    renderTechTree();
 
     renderRoomsGrid();
     renderStationGrid();
@@ -2054,9 +2104,7 @@
         b.classList.toggle("active", b.dataset.value === state.controls[key]);
       }
     }
-    for (const [checkboxId, key] of TECH_TOGGLES) {
-      document.getElementById(checkboxId).checked = state.controls[key];
-    }
+    renderTechTree();
     renderRoomsGrid();
     renderStationGrid();
     renderManagersList();

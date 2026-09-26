@@ -139,6 +139,57 @@ const DEFAULT_ENTITIES = [
   { id: "neural-matrix",        name: "Neural Matrix",        category: "item", basePrice: 452000000000000000000000000000000, stars: 0, smeltTimeSeconds: 699000, unlockedByDefault: false, ingredients: [{ sellableId: "antimatter-cell", amount: 16 }, { sellableId: "solar-collector", amount: 1 }, { sellableId: "osmium-bar", amount: 16000 }] },
 ];
 
+// Layout for the "Researched tech" tree in app.js, matching the in-game tech
+// tree's own spatial arrangement (see assets/tech_tree.png, not committed —
+// a player-supplied reference screenshot). `col`/`row` are 0-indexed grid
+// coordinates on an 8x6 grid. Nodes with a `key` are the 10 techs the model
+// actually uses (`key` matches a defaultControls() flag in app.js, `id`
+// matches an assets/icons/<id>.webp file); nodes without a `key` are other
+// in-game techs that don't affect this tool's math and are rendered as inert
+// context so the tree's connectors don't dead-end into empty grid cells —
+// their icons live in assets/icons/tech-tree/ctx-c<col>r<row>.webp. `edges`
+// are the tree's connector lines, referencing nodes by `c<col>r<row>` id.
+const TECH_TREE = {
+  cols: 8,
+  rows: 6,
+  nodes: [
+    // -------------------------------------------------------- modeled ----
+    { col: 4, row: 1, id: "tech-advanced-furnace", key: "techAdvancedFurnace", name: "Adv. Furnace", effect: "all smelters ×1.2 speed" },
+    { col: 4, row: 2, id: "tech-smelting-efficiency", key: "techSmeltingEfficiency", name: "Smelting Eff.", effect: "all smelter ingredients −20%" },
+    { col: 4, row: 3, id: "tech-superior-furnace", key: "techSuperiorFurnace", name: "Sup. Furnace", effect: "all smelters ×1.2 speed" },
+    { col: 5, row: 2, id: "tech-advanced-alloy-value", key: "techAdvancedAlloyValue", name: "Adv. Alloy Value", effect: "all alloy values ×1.2" },
+    { col: 6, row: 2, id: "tech-superior-alloy-value", key: "techSuperiorAlloyValue", name: "Sup. Alloy Value", effect: "all alloy values ×1.2" },
+    { col: 2, row: 2, id: "tech-advanced-crafting", key: "techAdvancedCrafting", name: "Adv. Crafting", effect: "all crafting stations ×1.2 speed" },
+    { col: 2, row: 3, id: "tech-crafting-efficiency", key: "techCraftingEfficiency", name: "Crafting Eff.", effect: "all crafting station ingredients −20%" },
+    { col: 2, row: 4, id: "tech-superior-crafting", key: "techSuperiorCrafting", name: "Sup. Crafting", effect: "all crafting stations ×1.2 speed" },
+    { col: 1, row: 3, id: "tech-advanced-item-value", key: "techAdvancedItemValue", name: "Adv. Item Value", effect: "all item values ×1.2" },
+    { col: 0, row: 3, id: "tech-superior-item-value", key: "techSuperiorItemValue", name: "Sup. Item Value", effect: "all item values ×1.2" },
+    // -------------------------------------------------------- context ----
+    { col: 3, row: 0 },
+    { col: 6, row: 0 },
+    { col: 7, row: 0 },
+    { col: 2, row: 1 },
+    { col: 6, row: 1 },
+    { col: 6, row: 3 },
+    { col: 0, row: 4 },
+    { col: 4, row: 4 },
+    { col: 5, row: 4 },
+    { col: 6, row: 4 },
+    { col: 7, row: 4 },
+    { col: 5, row: 5 },
+    { col: 6, row: 5 },
+  ],
+  edges: [
+    ["c3r0", "c2r1"], ["c3r0", "c4r1"],
+    ["c2r1", "c2r2"], ["c2r2", "c2r3"], ["c2r3", "c2r4"], ["c2r2", "c1r3"],
+    ["c1r3", "c0r3"], ["c1r3", "c0r4"], ["c1r3", "c2r4"],
+    ["c4r1", "c4r2"], ["c4r2", "c4r3"], ["c4r1", "c5r2"],
+    ["c5r2", "c6r2"], ["c5r2", "c4r3"], ["c5r2", "c6r3"],
+    ["c6r0", "c7r0"], ["c6r0", "c6r1"],
+    ["c4r4", "c4r3"], ["c5r4", "c6r4"], ["c6r4", "c7r4"], ["c5r4", "c5r5"], ["c5r4", "c6r5"], ["c5r4", "c4r3"],
+  ],
+};
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { DEFAULT_ENTITIES };
+  module.exports = { DEFAULT_ENTITIES, TECH_TREE };
 }

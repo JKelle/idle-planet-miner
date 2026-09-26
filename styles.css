@@ -22,6 +22,10 @@
    * the page, and the two meanings should be free to diverge later. */
   --market-up: #15803d;
   --market-down: #c0362c;
+  /* Tech tree "researched" border, matching the in-game tree's own green
+   * highlight. Deliberately not --market-up — "researched" and "price
+   * going up" are unrelated ideas and should be free to diverge later. */
+  --tech-on: #15803d;
   --radius: 12px;
   --radius-lg: 16px;
   --shadow: 0 1px 2px rgba(18, 22, 45, 0.04), 0 6px 20px rgba(18, 22, 45, 0.06);
@@ -475,19 +479,77 @@ select {
   text-decoration: underline;
 }
 
-/* ---- researched tech toggles ---- */
-.techs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* ---- researched tech tree ---- */
+.tech-tree-scroll {
+  overflow-x: auto;
 }
 
-.tech-toggle {
-  display: flex;
-  align-items: center;
+.tech-tree {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--tech-cols, 8), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--tech-rows, 6), auto);
   gap: 6px;
-  font-size: var(--fs-sm);
+  min-width: 560px;
+  padding: 8px 2px;
+}
+
+.tech-tree-edges {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.tech-tree-edges line {
+  stroke: var(--border);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.tech-node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  font: inherit;
   cursor: pointer;
+}
+
+.tech-node.is-researched {
+  border-color: var(--tech-on);
+}
+
+.tech-node:not(.is-researched):not(.is-context) {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.tech-node.is-context {
+  border-color: transparent;
+  background: none;
+  opacity: 0.2;
+  cursor: default;
+}
+
+.tech-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.tech-name {
+  font-size: 0.6875rem;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--text-soft);
 }
 
 .control-hint {
