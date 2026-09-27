@@ -494,22 +494,8 @@ select {
   padding: 8px 2px;
 }
 
-.tech-tree-edges {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.tech-tree-edges line {
-  stroke: var(--border);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
 .tech-node {
   position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;

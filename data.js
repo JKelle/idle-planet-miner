@@ -146,9 +146,8 @@ const DEFAULT_ENTITIES = [
 // actually uses (`key` matches a defaultControls() flag in app.js, `id`
 // matches an assets/icons/<id>.webp file); nodes without a `key` are other
 // in-game techs that don't affect this tool's math and are rendered as inert
-// context so the tree's connectors don't dead-end into empty grid cells —
-// their icons live in assets/icons/tech-tree/ctx-c<col>r<row>.webp. `edges`
-// are the tree's connector lines, referencing nodes by `c<col>r<row>` id.
+// context so the tree's shape stays recognizable — their icons live in
+// assets/icons/tech-tree/ctx-c<col>r<row>.webp.
 const TECH_TREE = {
   cols: 8,
   rows: 6,
@@ -178,15 +177,6 @@ const TECH_TREE = {
     { col: 7, row: 4 },
     { col: 5, row: 5 },
     { col: 6, row: 5 },
-  ],
-  edges: [
-    ["c3r0", "c2r1"], ["c3r0", "c4r1"],
-    ["c2r1", "c2r2"], ["c2r2", "c2r3"], ["c2r3", "c2r4"], ["c2r2", "c1r3"],
-    ["c1r3", "c0r3"], ["c1r3", "c0r4"], ["c1r3", "c2r4"],
-    ["c4r1", "c4r2"], ["c4r2", "c4r3"], ["c4r1", "c5r2"],
-    ["c5r2", "c6r2"], ["c5r2", "c4r3"], ["c5r2", "c6r3"],
-    ["c6r0", "c7r0"], ["c6r0", "c6r1"],
-    ["c4r4", "c4r3"], ["c5r4", "c6r4"], ["c6r4", "c7r4"], ["c5r4", "c5r5"], ["c5r4", "c6r5"], ["c5r4", "c4r3"],
   ],
 };
 

@@ -1418,24 +1418,14 @@
   // the same col/row coordinates as the in-game tech tree. Modeled nodes
   // (those with a `key`) are clickable buttons wired to state.controls;
   // nodes without a `key` are other in-game techs this tool doesn't model,
-  // rendered dim and inert just to keep the tree's shape recognizable and
-  // its connector lines from dead-ending. Same full-rebuild convention as
-  // renderStationGrid above.
+  // rendered dim and inert just to keep the tree's shape recognizable. Same
+  // full-rebuild convention as renderStationGrid above.
   function renderTechTree() {
     const container = document.getElementById("tech-tree");
     container.style.setProperty("--tech-cols", String(TECH_TREE.cols));
     container.style.setProperty("--tech-rows", String(TECH_TREE.rows));
 
-    const nodeByCoordId = {};
-    for (const node of TECH_TREE.nodes) nodeByCoordId[`c${node.col}r${node.row}`] = node;
-    const lines = TECH_TREE.edges
-      .map(([a, b]) => {
-        const na = nodeByCoordId[a];
-        const nb = nodeByCoordId[b];
-        return `<line x1="${na.col + 0.5}" y1="${na.row + 0.5}" x2="${nb.col + 0.5}" y2="${nb.row + 0.5}" />`;
-      })
-      .join("");
-    container.innerHTML = `<svg class="tech-tree-edges" viewBox="0 0 ${TECH_TREE.cols} ${TECH_TREE.rows}" preserveAspectRatio="none">${lines}</svg>`;
+    container.innerHTML = "";
 
     for (const node of TECH_TREE.nodes) {
       const el = document.createElement(node.key ? "button" : "div");
